@@ -27,6 +27,17 @@ class StructureLensAnalysisTests(unittest.TestCase):
         self.assertIn("Parameter Impact", md)
         self.assertIn("Detected Subgroups", md)
 
+    def test_what_if_sequence_override_reports_delta(self):
+        report = analyze_model("examples/tiny_transformer_block.json", what_if={"S": 256}).to_dict()
+        self.assertEqual(len(report["what_if"]), 1)
+        summary = report["what_if"][0]
+        self.assertEqual(summary["overrides"], {"S": 256})
+        self.assertGreater(summary["known_flops_after"], summary["known_flops_before"])
+        self.assertGreater(summary["changed_node_count"], 0)
+        md = render_markdown(report)
+        self.assertIn("What-if Analysis", md)
+        self.assertIn("S=256", md)
+
 
 if __name__ == "__main__":
     unittest.main()

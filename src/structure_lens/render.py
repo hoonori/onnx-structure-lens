@@ -49,6 +49,26 @@ def render_markdown(report: dict[str, Any]) -> str:
     for p in report["param_impacts"][:30]:
         lines.append(f"| `{p['param']}` | {len(p['affected_nodes'])} | {p['known_flops']:,} | {p['known_bytes']:,} |")
     lines.append("")
+    if report.get("what_if"):
+        lines.append("## What-if Analysis")
+        for w in report["what_if"]:
+            overrides = ", ".join(f"{k}={v}" for k, v in w["overrides"].items())
+            ratio = w.get("known_flops_ratio")
+            ratio_text = "?" if ratio is None else f"{ratio:.2f}x"
+            lines.append(f"### `{overrides}`")
+            lines.append(f"- Known FLOPs: {w['known_flops_before']:,} → {w['known_flops_after']:,} ({w['known_flops_delta']:+,}, {ratio_text})")
+            lines.append(f"- Known bytes: {w['known_bytes_before']:,} → {w['known_bytes_after']:,} ({w['known_bytes_delta']:+,})")
+            lines.append(f"- Changed nodes: {w['changed_node_count']}")
+            lines.append("| Node | Op | FLOPs before | FLOPs after | Delta | Ratio |")
+            lines.append("|---|---|---:|---:|---:|---:|")
+            for n in w["top_changed_nodes"][:20]:
+                bf = "?" if n["flops_before"] is None else f"{n['flops_before']:,}"
+                af = "?" if n["flops_after"] is None else f"{n['flops_after']:,}"
+                delta = "?" if n["flops_delta"] is None else f"{n['flops_delta']:+,}"
+                nr = n.get("flops_ratio")
+                nr_text = "?" if nr is None else f"{nr:.2f}x"
+                lines.append(f"| `{n['node']}` | {n['op_type']} | {bf} | {af} | {delta} | {nr_text} |")
+            lines.append("")
     lines.append("## Detected Subgroups")
     for s in report["subgroups"][:50]:
         lines.append(f"- **{s['name']}** (`{s['kind']}`): {', '.join(s['nodes'])} — {s['reason']}")

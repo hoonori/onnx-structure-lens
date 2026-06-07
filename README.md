@@ -32,6 +32,7 @@ pip install -e '.[onnx]'
 
 ```bash
 PYTHONPATH=src python -m structure_lens.cli examples/tiny_transformer_block.json \
+  --what-if S=256 \
   --markdown reports/demo.md \
   --html reports/demo.html \
   --json reports/demo.json
