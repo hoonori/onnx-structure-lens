@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onnx-structure-lens"
+version = "0.1.0"
+description = "Human-readable ONNX graph topology, hyperparameter linkage, impact, and subgroup analysis"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Jihoon Kim"}]
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+onnx = ["onnx>=1.16"]
+dev = ["pytest>=8", "onnx>=1.16"]
+
+[project.scripts]
+structure-lens = "structure_lens.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
