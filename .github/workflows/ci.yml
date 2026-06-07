@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile package
+        run: python -m py_compile src/structure_lens/*.py
+      - name: Run unit tests
+        run: PYTHONPATH=src python -m unittest discover -s tests -v
+      - name: Generate demo report
+        run: |
+          PYTHONPATH=src python -m structure_lens.cli examples/tiny_transformer_block.json             --what-if S=256             --markdown /tmp/structure-lens-demo.md             --json /tmp/structure-lens-demo.json
+          test -s /tmp/structure-lens-demo.md
+          test -s /tmp/structure-lens-demo.json
