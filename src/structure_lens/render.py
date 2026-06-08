@@ -214,6 +214,105 @@ def _render_node_graph_svg(
     return f'<svg id="{_h(svg_id)}" class="topology-svg" viewBox="0 0 {max_x} {max_y}" role="img" aria-label="{_h(aria_label)}">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
 
 
+
+
+def _overview_label(group: dict[str, Any]) -> str:
+    title = group["title"]
+    if ":" in title:
+        return title.split(":", 1)[0]
+    if ".." in title:
+        return title.split("..", 1)[0]
+    return title
+
+
+def _overview_group_graph_data(report: dict[str, Any], groups: list[dict[str, Any]]) -> dict[str, Any]:
+    owner = _group_node_lookup(groups)
+    group_by_id = {g["id"]: g for g in groups}
+    subgroup_ids = [g["id"] for g in groups if g["id"].startswith("subgroup:")]
+    # Keep one coarse card per detected high-level group. Detailed node names stay
+    # inside subgroup detail panes, not in this overview.
+    nodes = [
+        {
+            "id": gid,
+            "title": _overview_label(group_by_id[gid]),
+            "kind": group_by_id[gid]["kind"],
+            "depth": min((report["topology"]["depth_by_node"].get(n, 0) for n in group_by_id[gid].get("nodes", [])), default=0),
+        }
+        for gid in subgroup_ids
+    ]
+    nodes.insert(0, {"id": "graph:inputs", "title": "Inputs", "kind": "io", "depth": -1})
+    nodes.append({"id": "graph:outputs", "title": "Outputs", "kind": "io", "depth": max(report["topology"]["depth_by_node"].values(), default=0) + 1})
+
+    edges: dict[tuple[str, str], set[str]] = {}
+    for src, dst, tensor in report["topology"]["edges"]:
+        raw_src_group = owner.get(src)
+        raw_dst_group = owner.get(dst)
+        if raw_src_group is None and raw_dst_group is None:
+            continue
+        src_group = raw_src_group or "graph:inputs"
+        dst_group = raw_dst_group or "graph:outputs"
+        if src_group == dst_group:
+            continue
+        if src_group not in group_by_id and src_group not in {"graph:inputs", "graph:outputs"}:
+            src_group = "graph:inputs"
+        if dst_group not in group_by_id and dst_group not in {"graph:inputs", "graph:outputs"}:
+            dst_group = "graph:outputs"
+        if src_group == dst_group:
+            continue
+        edges.setdefault((src_group, dst_group), set()).add(tensor)
+    return {
+        "nodes": nodes,
+        "edges": [{"src": s, "dst": d, "tensors": sorted(tensors)} for (s, d), tensors in edges.items()],
+    }
+
+
+def _overview_positions(graph: dict[str, Any]) -> dict[str, tuple[int, int]]:
+    by_depth: dict[int, list[dict[str, Any]]] = {}
+    for node in graph.get("nodes", []):
+        by_depth.setdefault(int(node.get("depth", 0)), []).append(node)
+    min_depth = min(by_depth, default=0)
+    positions: dict[str, tuple[int, int]] = {}
+    for depth, nodes in by_depth.items():
+        for lane, node in enumerate(sorted(nodes, key=lambda n: n["title"])):
+            positions[node["id"]] = (120 + (depth - min_depth) * 180, 80 + lane * 100)
+    return positions
+
+
+def _render_overview_graph_svg(report: dict[str, Any], groups: list[dict[str, Any]]) -> str:
+    graph = _overview_group_graph_data(report, groups)
+    if not graph["nodes"]:
+        return ""
+    positions = _overview_positions(graph)
+    max_x = max((x for x, _ in positions.values()), default=900) + 140
+    max_y = max((y for _, y in positions.values()), default=260) + 80
+    edge_svg: list[str] = []
+    for edge in graph["edges"]:
+        src = edge["src"]
+        dst = edge["dst"]
+        if src not in positions or dst not in positions:
+            continue
+        x1, y1 = positions[src]
+        x2, y2 = positions[dst]
+        mid = (x1 + x2) // 2
+        edge_id = f"{_h(src)}->{_h(dst)}"
+        labels = ", ".join(edge.get("tensors", [])[:3])
+        edge_svg.append(
+            f'<path class="topo-edge" data-overview-edge="{edge_id}" d="M{x1+74},{y1} C{mid},{y1} {mid},{y2} {x2-74},{y2}" />'
+            f'<text class="edge-label" x="{mid}" y="{(y1+y2)//2 - 6}">{_h(labels)}</text>'
+        )
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    node_svg: list[str] = []
+    for gid, (x, y) in positions.items():
+        node = node_by_id[gid]
+        node_svg.append(
+            f'<g class="topo-node coarse-node {node["kind"]}" data-group-id="{_h(gid)}" tabindex="0">'
+            f'<rect x="{x-74}" y="{y-30}" width="148" height="60" rx="14" />'
+            f'<text class="node-title" x="{x}" y="{y-5}">{_h(node["title"][:20])}</text>'
+            f'<text class="node-subtitle" x="{x}" y="{y+16}">{_h(node["kind"])}</text>'
+            f'</g>'
+        )
+    return f'<svg id="overview-graph" class="topology-svg" viewBox="0 0 {max_x} {max_y}" role="img" aria-label="Coarse topology overview graph">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
+
 def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
     g = report["graph"]
     topo = report["topology"]
@@ -387,8 +486,7 @@ def _render_group_graph(groups: list[dict[str, Any]]) -> str:
 
 def render_html(report: dict[str, Any]) -> str:
     groups = _build_group_data(report)
-    group_owner = _group_node_lookup(groups)
-    overview_graph = _render_node_graph_svg(_node_graph_data(report), svg_id="overview-graph", aria_label="Topology overview graph", group_owner=group_owner)
+    overview_graph = _render_overview_graph_svg(report, groups)
     payload = json.dumps({"report": report, "groups": groups}, ensure_ascii=False).replace("</", "<\\/")
     initial_detail = _render_static_detail(groups[0])
     graph = report["graph"]

@@ -57,12 +57,16 @@ class StructureLensAnalysisTests(unittest.TestCase):
 
         report = analyze_model("examples/tiny_transformer_block.json", what_if={"S": 256}).to_dict()
         doc = render_html(report)
-        self.assertIn('id="overview-graph"', doc)
-        self.assertIn('data-topology-edge="ln1->q_proj"', doc)
-        self.assertIn('data-overview-edge', doc)
+        overview = doc[doc.index('id="overview-graph"') : doc.index('</svg>', doc.index('id="overview-graph"'))]
+        self.assertIn('data-overview-edge', overview)
+        self.assertIn('AttentionCore', overview)
+        self.assertIn('LinearChain', overview)
+        self.assertNotIn('>q_proj<', overview)
+        self.assertNotIn('>qk_scores<', overview)
+        self.assertNotIn('>softmax<', overview)
         self.assertIn('internal node graph', doc)
-        self.assertIn('data-node-edge="qk_scores->softmax"', doc)
-        self.assertIn('data-node-edge="softmax->attn_ctx"', doc)
+        self.assertIn('"src": "qk_scores", "dst": "softmax"', doc)
+        self.assertIn('"src": "softmax", "dst": "attn_ctx"', doc)
 
 
 if __name__ == "__main__":
