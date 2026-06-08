@@ -1,0 +1,1239 @@
+{
+  "graph": {
+    "name": "tiny_transformer_block",
+    "node_count": 15,
+    "tensor_count": 22,
+    "input_count": 1,
+    "output_count": 1,
+    "known_flops": 17186816,
+    "known_bytes": 1835008
+  },
+  "topology": {
+    "topological_order": [
+      "ln1",
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "k_transpose",
+      "qk_scores",
+      "softmax",
+      "attn_ctx",
+      "out_proj",
+      "residual_1",
+      "ln2",
+      "fc1",
+      "gelu",
+      "fc2",
+      "residual_2"
+    ],
+    "depth_by_node": {
+      "ln1": 0,
+      "q_proj": 1,
+      "k_proj": 1,
+      "v_proj": 1,
+      "k_transpose": 2,
+      "qk_scores": 3,
+      "softmax": 4,
+      "attn_ctx": 5,
+      "out_proj": 6,
+      "residual_1": 7,
+      "ln2": 8,
+      "fc1": 9,
+      "gelu": 10,
+      "fc2": 11,
+      "residual_2": 12
+    },
+    "critical_path": [
+      "ln1",
+      "k_proj",
+      "k_transpose",
+      "qk_scores",
+      "softmax",
+      "attn_ctx",
+      "out_proj",
+      "residual_1",
+      "ln2",
+      "fc1",
+      "gelu",
+      "fc2",
+      "residual_2"
+    ],
+    "fanout_nodes": [
+      [
+        "ln1",
+        3
+      ],
+      [
+        "residual_1",
+        2
+      ]
+    ],
+    "fanin_nodes": [
+      [
+        "qk_scores",
+        2
+      ],
+      [
+        "attn_ctx",
+        2
+      ],
+      [
+        "residual_2",
+        2
+      ]
+    ],
+    "source_nodes": [
+      "ln1"
+    ],
+    "sink_nodes": [
+      "residual_2"
+    ],
+    "edges": [
+      [
+        "ln1",
+        "q_proj",
+        "ln1_out"
+      ],
+      [
+        "ln1",
+        "k_proj",
+        "ln1_out"
+      ],
+      [
+        "ln1",
+        "v_proj",
+        "ln1_out"
+      ],
+      [
+        "q_proj",
+        "qk_scores",
+        "q"
+      ],
+      [
+        "k_proj",
+        "k_transpose",
+        "k"
+      ],
+      [
+        "v_proj",
+        "attn_ctx",
+        "v"
+      ],
+      [
+        "k_transpose",
+        "qk_scores",
+        "kt"
+      ],
+      [
+        "qk_scores",
+        "softmax",
+        "scores"
+      ],
+      [
+        "softmax",
+        "attn_ctx",
+        "prob"
+      ],
+      [
+        "attn_ctx",
+        "out_proj",
+        "ctx"
+      ],
+      [
+        "out_proj",
+        "residual_1",
+        "proj"
+      ],
+      [
+        "residual_1",
+        "ln2",
+        "res1"
+      ],
+      [
+        "residual_1",
+        "residual_2",
+        "res1"
+      ],
+      [
+        "ln2",
+        "fc1",
+        "ln2_out"
+      ],
+      [
+        "fc1",
+        "gelu",
+        "fc1"
+      ],
+      [
+        "gelu",
+        "fc2",
+        "gelu"
+      ],
+      [
+        "fc2",
+        "residual_2",
+        "fc2"
+      ]
+    ]
+  },
+  "shape_params": [
+    {
+      "key": "B=1",
+      "label": "B",
+      "dim_value": 1,
+      "tensor_axes": [
+        [
+          "x",
+          0
+        ],
+        [
+          "ln1_out",
+          0
+        ],
+        [
+          "q",
+          0
+        ],
+        [
+          "k",
+          0
+        ],
+        [
+          "v",
+          0
+        ],
+        [
+          "kt",
+          0
+        ],
+        [
+          "scores",
+          0
+        ],
+        [
+          "prob",
+          0
+        ],
+        [
+          "ctx",
+          0
+        ],
+        [
+          "proj",
+          0
+        ],
+        [
+          "res1",
+          0
+        ],
+        [
+          "ln2_out",
+          0
+        ],
+        [
+          "fc1",
+          0
+        ],
+        [
+          "gelu",
+          0
+        ],
+        [
+          "fc2",
+          0
+        ],
+        [
+          "out",
+          0
+        ]
+      ],
+      "producer_nodes": [
+        "attn_ctx",
+        "fc1",
+        "fc2",
+        "gelu",
+        "k_proj",
+        "k_transpose",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "qk_scores",
+        "residual_1",
+        "residual_2",
+        "softmax",
+        "v_proj"
+      ],
+      "consumer_nodes": [
+        "attn_ctx",
+        "fc1",
+        "fc2",
+        "gelu",
+        "k_proj",
+        "k_transpose",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "qk_scores",
+        "residual_1",
+        "residual_2",
+        "softmax",
+        "v_proj"
+      ],
+      "node_count": 15
+    },
+    {
+      "key": "S=128",
+      "label": "S",
+      "dim_value": 128,
+      "tensor_axes": [
+        [
+          "x",
+          1
+        ],
+        [
+          "ln1_out",
+          1
+        ],
+        [
+          "q",
+          1
+        ],
+        [
+          "k",
+          1
+        ],
+        [
+          "v",
+          1
+        ],
+        [
+          "scores",
+          1
+        ],
+        [
+          "prob",
+          1
+        ],
+        [
+          "ctx",
+          1
+        ],
+        [
+          "proj",
+          1
+        ],
+        [
+          "res1",
+          1
+        ],
+        [
+          "ln2_out",
+          1
+        ],
+        [
+          "fc1",
+          1
+        ],
+        [
+          "gelu",
+          1
+        ],
+        [
+          "fc2",
+          1
+        ],
+        [
+          "out",
+          1
+        ]
+      ],
+      "producer_nodes": [
+        "attn_ctx",
+        "fc1",
+        "fc2",
+        "gelu",
+        "k_proj",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "qk_scores",
+        "residual_1",
+        "residual_2",
+        "softmax",
+        "v_proj"
+      ],
+      "consumer_nodes": [
+        "attn_ctx",
+        "fc1",
+        "fc2",
+        "gelu",
+        "k_proj",
+        "k_transpose",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "qk_scores",
+        "residual_1",
+        "residual_2",
+        "softmax",
+        "v_proj"
+      ],
+      "node_count": 15
+    },
+    {
+      "key": "C=64",
+      "label": "C",
+      "dim_value": 64,
+      "tensor_axes": [
+        [
+          "x",
+          2
+        ],
+        [
+          "ln1_out",
+          2
+        ],
+        [
+          "q",
+          2
+        ],
+        [
+          "k",
+          2
+        ],
+        [
+          "v",
+          2
+        ],
+        [
+          "ctx",
+          2
+        ],
+        [
+          "proj",
+          2
+        ],
+        [
+          "res1",
+          2
+        ],
+        [
+          "ln2_out",
+          2
+        ],
+        [
+          "fc2",
+          2
+        ],
+        [
+          "out",
+          2
+        ]
+      ],
+      "producer_nodes": [
+        "attn_ctx",
+        "fc2",
+        "k_proj",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "residual_1",
+        "residual_2",
+        "v_proj"
+      ],
+      "consumer_nodes": [
+        "attn_ctx",
+        "fc1",
+        "k_proj",
+        "k_transpose",
+        "ln1",
+        "ln2",
+        "out_proj",
+        "q_proj",
+        "qk_scores",
+        "residual_1",
+        "residual_2",
+        "v_proj"
+      ],
+      "node_count": 13
+    },
+    {
+      "key": "M=64",
+      "label": "M",
+      "dim_value": 64,
+      "tensor_axes": [
+        [
+          "wq",
+          0
+        ],
+        [
+          "wk",
+          0
+        ],
+        [
+          "wv",
+          0
+        ],
+        [
+          "wo",
+          0
+        ],
+        [
+          "w1",
+          0
+        ]
+      ],
+      "producer_nodes": [],
+      "consumer_nodes": [
+        "fc1",
+        "k_proj",
+        "out_proj",
+        "q_proj",
+        "v_proj"
+      ],
+      "node_count": 5
+    },
+    {
+      "key": "N=64",
+      "label": "N",
+      "dim_value": 64,
+      "tensor_axes": [
+        [
+          "wq",
+          1
+        ],
+        [
+          "wk",
+          1
+        ],
+        [
+          "wv",
+          1
+        ],
+        [
+          "wo",
+          1
+        ],
+        [
+          "w2",
+          1
+        ]
+      ],
+      "producer_nodes": [],
+      "consumer_nodes": [
+        "fc2",
+        "k_proj",
+        "out_proj",
+        "q_proj",
+        "v_proj"
+      ],
+      "node_count": 5
+    },
+    {
+      "key": "C=128",
+      "label": "C",
+      "dim_value": 128,
+      "tensor_axes": [
+        [
+          "kt",
+          2
+        ],
+        [
+          "scores",
+          2
+        ],
+        [
+          "prob",
+          2
+        ]
+      ],
+      "producer_nodes": [
+        "k_transpose",
+        "qk_scores",
+        "softmax"
+      ],
+      "consumer_nodes": [
+        "attn_ctx",
+        "qk_scores",
+        "softmax"
+      ],
+      "node_count": 4
+    },
+    {
+      "key": "C=256",
+      "label": "C",
+      "dim_value": 256,
+      "tensor_axes": [
+        [
+          "fc1",
+          2
+        ],
+        [
+          "gelu",
+          2
+        ]
+      ],
+      "producer_nodes": [
+        "fc1",
+        "gelu"
+      ],
+      "consumer_nodes": [
+        "fc2",
+        "gelu"
+      ],
+      "node_count": 3
+    },
+    {
+      "key": "S=64",
+      "label": "S",
+      "dim_value": 64,
+      "tensor_axes": [
+        [
+          "kt",
+          1
+        ]
+      ],
+      "producer_nodes": [
+        "k_transpose"
+      ],
+      "consumer_nodes": [
+        "qk_scores"
+      ],
+      "node_count": 2
+    },
+    {
+      "key": "M=256",
+      "label": "M",
+      "dim_value": 256,
+      "tensor_axes": [
+        [
+          "w2",
+          0
+        ]
+      ],
+      "producer_nodes": [],
+      "consumer_nodes": [
+        "fc2"
+      ],
+      "node_count": 1
+    },
+    {
+      "key": "N=256",
+      "label": "N",
+      "dim_value": 256,
+      "tensor_axes": [
+        [
+          "w1",
+          1
+        ]
+      ],
+      "producer_nodes": [],
+      "consumer_nodes": [
+        "fc1"
+      ],
+      "node_count": 1
+    }
+  ],
+  "node_costs": [
+    {
+      "node": "ln1",
+      "op_type": "LayerNormalization",
+      "flops": 40960,
+      "bytes_moved": 65536,
+      "formula": "~5 * elements",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "q_proj",
+      "op_type": "MatMul",
+      "flops": 1048576,
+      "bytes_moved": 81920,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "M=64",
+        "N=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "k_proj",
+      "op_type": "MatMul",
+      "flops": 1048576,
+      "bytes_moved": 81920,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "M=64",
+        "N=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "v_proj",
+      "op_type": "MatMul",
+      "flops": 1048576,
+      "bytes_moved": 81920,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "M=64",
+        "N=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "k_transpose",
+      "op_type": "Transpose",
+      "flops": null,
+      "bytes_moved": 65536,
+      "formula": "shape-only / metadata op",
+      "affected_params": [
+        "B=1",
+        "C=128",
+        "C=64",
+        "S=128",
+        "S=64"
+      ]
+    },
+    {
+      "node": "qk_scores",
+      "op_type": "MatMul",
+      "flops": 2097152,
+      "bytes_moved": 131072,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=128",
+        "C=64",
+        "S=128",
+        "S=64"
+      ]
+    },
+    {
+      "node": "softmax",
+      "op_type": "Softmax",
+      "flops": 49152,
+      "bytes_moved": 131072,
+      "formula": "~3 * elements along softmax axis",
+      "affected_params": [
+        "B=1",
+        "C=128",
+        "S=128"
+      ]
+    },
+    {
+      "node": "attn_ctx",
+      "op_type": "MatMul",
+      "flops": 2097152,
+      "bytes_moved": 131072,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=128",
+        "C=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "out_proj",
+      "op_type": "MatMul",
+      "flops": 1048576,
+      "bytes_moved": 81920,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "M=64",
+        "N=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "residual_1",
+      "op_type": "Add",
+      "flops": 8192,
+      "bytes_moved": 98304,
+      "formula": "1 * output_elements",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "ln2",
+      "op_type": "LayerNormalization",
+      "flops": 40960,
+      "bytes_moved": 65536,
+      "formula": "~5 * elements",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "fc1",
+      "op_type": "MatMul",
+      "flops": 4194304,
+      "bytes_moved": 229376,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=256",
+        "C=64",
+        "M=64",
+        "N=256",
+        "S=128"
+      ]
+    },
+    {
+      "node": "gelu",
+      "op_type": "Gelu",
+      "flops": 262144,
+      "bytes_moved": 262144,
+      "formula": "~8 * output_elements activation approximation",
+      "affected_params": [
+        "B=1",
+        "C=256",
+        "S=128"
+      ]
+    },
+    {
+      "node": "fc2",
+      "op_type": "MatMul",
+      "flops": 4194304,
+      "bytes_moved": 229376,
+      "formula": "2 * batch * M * K * N",
+      "affected_params": [
+        "B=1",
+        "C=256",
+        "C=64",
+        "M=256",
+        "N=64",
+        "S=128"
+      ]
+    },
+    {
+      "node": "residual_2",
+      "op_type": "Add",
+      "flops": 8192,
+      "bytes_moved": 98304,
+      "formula": "1 * output_elements",
+      "affected_params": [
+        "B=1",
+        "C=64",
+        "S=128"
+      ]
+    }
+  ],
+  "param_impacts": [
+    {
+      "param": "B=1",
+      "affected_nodes": [
+        "ln1",
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "k_transpose",
+        "qk_scores",
+        "softmax",
+        "attn_ctx",
+        "out_proj",
+        "residual_1",
+        "ln2",
+        "fc1",
+        "gelu",
+        "fc2",
+        "residual_2"
+      ],
+      "known_flops": 17186816,
+      "known_bytes": 1835008,
+      "explanation": "B=1 appears in 16 tensor axes and touches 15 graph nodes."
+    },
+    {
+      "param": "S=128",
+      "affected_nodes": [
+        "ln1",
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "k_transpose",
+        "qk_scores",
+        "softmax",
+        "attn_ctx",
+        "out_proj",
+        "residual_1",
+        "ln2",
+        "fc1",
+        "gelu",
+        "fc2",
+        "residual_2"
+      ],
+      "known_flops": 17186816,
+      "known_bytes": 1835008,
+      "explanation": "S=128 appears in 15 tensor axes and touches 15 graph nodes."
+    },
+    {
+      "param": "C=64",
+      "affected_nodes": [
+        "ln1",
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "k_transpose",
+        "qk_scores",
+        "attn_ctx",
+        "out_proj",
+        "residual_1",
+        "ln2",
+        "fc1",
+        "fc2",
+        "residual_2"
+      ],
+      "known_flops": 16875520,
+      "known_bytes": 1441792,
+      "explanation": "C=64 appears in 11 tensor axes and touches 13 graph nodes."
+    },
+    {
+      "param": "C=256",
+      "affected_nodes": [
+        "fc1",
+        "gelu",
+        "fc2"
+      ],
+      "known_flops": 8650752,
+      "known_bytes": 720896,
+      "explanation": "C=256 appears in 2 tensor axes and touches 3 graph nodes."
+    },
+    {
+      "param": "M=64",
+      "affected_nodes": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "out_proj",
+        "fc1"
+      ],
+      "known_flops": 8388608,
+      "known_bytes": 557056,
+      "explanation": "M=64 appears in 5 tensor axes and touches 5 graph nodes."
+    },
+    {
+      "param": "N=64",
+      "affected_nodes": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "out_proj",
+        "fc2"
+      ],
+      "known_flops": 8388608,
+      "known_bytes": 557056,
+      "explanation": "N=64 appears in 5 tensor axes and touches 5 graph nodes."
+    },
+    {
+      "param": "C=128",
+      "affected_nodes": [
+        "k_transpose",
+        "qk_scores",
+        "softmax",
+        "attn_ctx"
+      ],
+      "known_flops": 4243456,
+      "known_bytes": 458752,
+      "explanation": "C=128 appears in 3 tensor axes and touches 4 graph nodes."
+    },
+    {
+      "param": "M=256",
+      "affected_nodes": [
+        "fc2"
+      ],
+      "known_flops": 4194304,
+      "known_bytes": 229376,
+      "explanation": "M=256 appears in 1 tensor axes and touches 1 graph nodes."
+    },
+    {
+      "param": "N=256",
+      "affected_nodes": [
+        "fc1"
+      ],
+      "known_flops": 4194304,
+      "known_bytes": 229376,
+      "explanation": "N=256 appears in 1 tensor axes and touches 1 graph nodes."
+    },
+    {
+      "param": "S=64",
+      "affected_nodes": [
+        "k_transpose",
+        "qk_scores"
+      ],
+      "known_flops": 2097152,
+      "known_bytes": 196608,
+      "explanation": "S=64 appears in 1 tensor axes and touches 2 graph nodes."
+    }
+  ],
+  "subgroups": [
+    {
+      "name": "AttentionCore:softmax",
+      "kind": "attention",
+      "nodes": [
+        "attn_ctx",
+        "qk_scores",
+        "softmax"
+      ],
+      "reason": "MatMul/Gemm -> Softmax -> MatMul/Gemm motif"
+    },
+    {
+      "name": "LinearChain:ln2..fc2",
+      "kind": "chain",
+      "nodes": [
+        "ln2",
+        "fc1",
+        "gelu",
+        "fc2"
+      ],
+      "reason": "Long single-producer/single-consumer chain"
+    },
+    {
+      "name": "LinearBias",
+      "kind": "pattern",
+      "nodes": [
+        "out_proj",
+        "residual_1"
+      ],
+      "reason": "Matched op pattern LinearBias"
+    },
+    {
+      "name": "LinearBias",
+      "kind": "pattern",
+      "nodes": [
+        "fc2",
+        "residual_2"
+      ],
+      "reason": "Matched op pattern LinearBias"
+    },
+    {
+      "name": "NormThenLinear",
+      "kind": "pattern",
+      "nodes": [
+        "ln2",
+        "fc1"
+      ],
+      "reason": "Matched op pattern NormThenLinear"
+    },
+    {
+      "name": "ResidualJoin:residual_2",
+      "kind": "residual",
+      "nodes": [
+        "fc2",
+        "residual_1",
+        "residual_2"
+      ],
+      "reason": "Add/Sum node merges multiple producer branches"
+    }
+  ],
+  "recommendations": [
+    "What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.",
+    "Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.",
+    "Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.",
+    "Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.",
+    "Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.",
+    "1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose."
+  ],
+  "what_if": [
+    {
+      "overrides": {
+        "S": 256
+      },
+      "known_flops_before": 17186816,
+      "known_flops_after": 34373632,
+      "known_flops_delta": 17186816,
+      "known_flops_ratio": 2.0,
+      "known_bytes_before": 1835008,
+      "known_bytes_after": 3604480,
+      "known_bytes_delta": 1769472,
+      "changed_node_count": 15,
+      "top_changed_nodes": [
+        {
+          "node": "fc1",
+          "op_type": "MatMul",
+          "flops_before": 4194304,
+          "flops_after": 8388608,
+          "flops_delta": 4194304,
+          "flops_ratio": 2.0,
+          "bytes_before": 229376,
+          "bytes_after": 393216,
+          "bytes_delta": 163840
+        },
+        {
+          "node": "fc2",
+          "op_type": "MatMul",
+          "flops_before": 4194304,
+          "flops_after": 8388608,
+          "flops_delta": 4194304,
+          "flops_ratio": 2.0,
+          "bytes_before": 229376,
+          "bytes_after": 393216,
+          "bytes_delta": 163840
+        },
+        {
+          "node": "qk_scores",
+          "op_type": "MatMul",
+          "flops_before": 2097152,
+          "flops_after": 4194304,
+          "flops_delta": 2097152,
+          "flops_ratio": 2.0,
+          "bytes_before": 131072,
+          "bytes_after": 327680,
+          "bytes_delta": 196608
+        },
+        {
+          "node": "attn_ctx",
+          "op_type": "MatMul",
+          "flops_before": 2097152,
+          "flops_after": 4194304,
+          "flops_delta": 2097152,
+          "flops_ratio": 2.0,
+          "bytes_before": 131072,
+          "bytes_after": 262144,
+          "bytes_delta": 131072
+        },
+        {
+          "node": "q_proj",
+          "op_type": "MatMul",
+          "flops_before": 1048576,
+          "flops_after": 2097152,
+          "flops_delta": 1048576,
+          "flops_ratio": 2.0,
+          "bytes_before": 81920,
+          "bytes_after": 147456,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "k_proj",
+          "op_type": "MatMul",
+          "flops_before": 1048576,
+          "flops_after": 2097152,
+          "flops_delta": 1048576,
+          "flops_ratio": 2.0,
+          "bytes_before": 81920,
+          "bytes_after": 147456,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "v_proj",
+          "op_type": "MatMul",
+          "flops_before": 1048576,
+          "flops_after": 2097152,
+          "flops_delta": 1048576,
+          "flops_ratio": 2.0,
+          "bytes_before": 81920,
+          "bytes_after": 147456,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "out_proj",
+          "op_type": "MatMul",
+          "flops_before": 1048576,
+          "flops_after": 2097152,
+          "flops_delta": 1048576,
+          "flops_ratio": 2.0,
+          "bytes_before": 81920,
+          "bytes_after": 147456,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "gelu",
+          "op_type": "Gelu",
+          "flops_before": 262144,
+          "flops_after": 524288,
+          "flops_delta": 262144,
+          "flops_ratio": 2.0,
+          "bytes_before": 262144,
+          "bytes_after": 524288,
+          "bytes_delta": 262144
+        },
+        {
+          "node": "softmax",
+          "op_type": "Softmax",
+          "flops_before": 49152,
+          "flops_after": 98304,
+          "flops_delta": 49152,
+          "flops_ratio": 2.0,
+          "bytes_before": 131072,
+          "bytes_after": 262144,
+          "bytes_delta": 131072
+        },
+        {
+          "node": "ln1",
+          "op_type": "LayerNormalization",
+          "flops_before": 40960,
+          "flops_after": 81920,
+          "flops_delta": 40960,
+          "flops_ratio": 2.0,
+          "bytes_before": 65536,
+          "bytes_after": 131072,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "ln2",
+          "op_type": "LayerNormalization",
+          "flops_before": 40960,
+          "flops_after": 81920,
+          "flops_delta": 40960,
+          "flops_ratio": 2.0,
+          "bytes_before": 65536,
+          "bytes_after": 131072,
+          "bytes_delta": 65536
+        },
+        {
+          "node": "residual_1",
+          "op_type": "Add",
+          "flops_before": 8192,
+          "flops_after": 16384,
+          "flops_delta": 8192,
+          "flops_ratio": 2.0,
+          "bytes_before": 98304,
+          "bytes_after": 196608,
+          "bytes_delta": 98304
+        },
+        {
+          "node": "residual_2",
+          "op_type": "Add",
+          "flops_before": 8192,
+          "flops_after": 16384,
+          "flops_delta": 8192,
+          "flops_ratio": 2.0,
+          "bytes_before": 98304,
+          "bytes_after": 196608,
+          "bytes_delta": 98304
+        },
+        {
+          "node": "k_transpose",
+          "op_type": "Transpose",
+          "flops_before": null,
+          "flops_after": null,
+          "flops_delta": null,
+          "flops_ratio": null,
+          "bytes_before": 65536,
+          "bytes_after": 196608,
+          "bytes_delta": 131072
+        }
+      ]
+    }
+  ]
+}

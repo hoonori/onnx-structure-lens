@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Structure Lens: tiny_transformer_block</title>
+<style>
+:root { color-scheme: dark; }
+body { margin:0; background:#0b1020; color:#dbeafe; font:14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
+header { position:sticky; top:0; background:#111827ee; backdrop-filter: blur(8px); padding:18px 28px; border-bottom:1px solid #334155; }
+h1 { margin:0; font-size:22px; }
+main { display:grid; grid-template-columns: minmax(0, 1.3fr) minmax(380px, .7fr); gap:20px; padding:24px; }
+.card { background:#111827; border:1px solid #334155; border-radius:16px; padding:18px; box-shadow: 0 8px 30px #0004; }
+pre { white-space:pre-wrap; word-break:break-word; margin:0; }
+.json { max-height:80vh; overflow:auto; color:#bfdbfe; }
+.badge { display:inline-block; margin-right:12px; color:#93c5fd; }
+</style>
+</head>
+<body>
+<header>
+<h1>Structure Lens: tiny_transformer_block</h1>
+<span class="badge">nodes 15</span>
+<span class="badge">known FLOPs 17,186,816</span>
+<span class="badge">subgroups 6</span>
+</header>
+<main>
+<section class="card"><pre># Structure Lens Report: tiny_transformer_block
+
+## Summary
+- Nodes: **15**
+- Tensors: **22**
+- Known FLOPs proxy: **17,186,816**
+- Known bytes moved proxy: **1,835,008**
+
+## Recommendations
+- What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.
+- Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.
+- Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.
+- Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.
+- Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.
+- 1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose.
+
+## Topology
+- Source nodes: ln1
+- Sink nodes: residual_2
+- Critical path length: 13
+- Critical path: ln1 → k_proj → k_transpose → qk_scores → softmax → attn_ctx → out_proj → residual_1 → ln2 → fc1 → gelu → fc2 → residual_2
+- Top fanout nodes: ln1(3), residual_1(2)
+- Top fanin nodes: qk_scores(2), attn_ctx(2), residual_2(2)
+
+## Shape / Hyperparameter Linkage
+| Param | Dim | Tensor axes | Nodes touched |
+|---|---:|---:|---:|
+| `B=1` | `1` | 16 | 15 |
+| `S=128` | `128` | 15 | 15 |
+| `C=64` | `64` | 11 | 13 |
+| `M=64` | `64` | 5 | 5 |
+| `N=64` | `64` | 5 | 5 |
+| `C=128` | `128` | 3 | 4 |
+| `C=256` | `256` | 2 | 3 |
+| `S=64` | `64` | 1 | 2 |
+| `M=256` | `256` | 1 | 1 |
+| `N=256` | `256` | 1 | 1 |
+
+## Parameter Impact
+| Param | Affected nodes | Known FLOPs | Known bytes |
+|---|---:|---:|---:|
+| `B=1` | 15 | 17,186,816 | 1,835,008 |
+| `S=128` | 15 | 17,186,816 | 1,835,008 |
+| `C=64` | 13 | 16,875,520 | 1,441,792 |
+| `C=256` | 3 | 8,650,752 | 720,896 |
+| `M=64` | 5 | 8,388,608 | 557,056 |
+| `N=64` | 5 | 8,388,608 | 557,056 |
+| `C=128` | 4 | 4,243,456 | 458,752 |
+| `M=256` | 1 | 4,194,304 | 229,376 |
+| `N=256` | 1 | 4,194,304 | 229,376 |
+| `S=64` | 2 | 2,097,152 | 196,608 |
+
+## What-if Analysis
+### `S=256`
+- Known FLOPs: 17,186,816 → 34,373,632 (+17,186,816, 2.00x)
+- Known bytes: 1,835,008 → 3,604,480 (+1,769,472)
+- Changed nodes: 15
+| Node | Op | FLOPs before | FLOPs after | Delta | Ratio |
+|---|---|---:|---:|---:|---:|
+| `fc1` | MatMul | 4,194,304 | 8,388,608 | +4,194,304 | 2.00x |
+| `fc2` | MatMul | 4,194,304 | 8,388,608 | +4,194,304 | 2.00x |
+| `qk_scores` | MatMul | 2,097,152 | 4,194,304 | +2,097,152 | 2.00x |
+| `attn_ctx` | MatMul | 2,097,152 | 4,194,304 | +2,097,152 | 2.00x |
+| `q_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
+| `k_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
+| `v_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
+| `out_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
+| `gelu` | Gelu | 262,144 | 524,288 | +262,144 | 2.00x |
+| `softmax` | Softmax | 49,152 | 98,304 | +49,152 | 2.00x |
+| `ln1` | LayerNormalization | 40,960 | 81,920 | +40,960 | 2.00x |
+| `ln2` | LayerNormalization | 40,960 | 81,920 | +40,960 | 2.00x |
+| `residual_1` | Add | 8,192 | 16,384 | +8,192 | 2.00x |
+| `residual_2` | Add | 8,192 | 16,384 | +8,192 | 2.00x |
+| `k_transpose` | Transpose | ? | ? | ? | ? |
+
+## Detected Subgroups
+- **AttentionCore:softmax** (`attention`): attn_ctx, qk_scores, softmax — MatMul/Gemm -&gt; Softmax -&gt; MatMul/Gemm motif
+- **LinearChain:ln2..fc2** (`chain`): ln2, fc1, gelu, fc2 — Long single-producer/single-consumer chain
+- **LinearBias** (`pattern`): out_proj, residual_1 — Matched op pattern LinearBias
+- **LinearBias** (`pattern`): fc2, residual_2 — Matched op pattern LinearBias
+- **NormThenLinear** (`pattern`): ln2, fc1 — Matched op pattern NormThenLinear
+- **ResidualJoin:residual_2** (`residual`): fc2, residual_1, residual_2 — Add/Sum node merges multiple producer branches
+
+## Top Node Costs
+| Node | Op | FLOPs | Bytes | Formula |
+|---|---|---:|---:|---|
+| `fc1` | MatMul | 4,194,304 | 229,376 | 2 * batch * M * K * N |
+| `fc2` | MatMul | 4,194,304 | 229,376 | 2 * batch * M * K * N |
+| `qk_scores` | MatMul | 2,097,152 | 131,072 | 2 * batch * M * K * N |
+| `attn_ctx` | MatMul | 2,097,152 | 131,072 | 2 * batch * M * K * N |
+| `q_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
+| `k_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
+| `v_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
+| `out_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
+| `gelu` | Gelu | 262,144 | 262,144 | ~8 * output_elements activation approximation |
+| `softmax` | Softmax | 49,152 | 131,072 | ~3 * elements along softmax axis |
+| `ln1` | LayerNormalization | 40,960 | 65,536 | ~5 * elements |
+| `ln2` | LayerNormalization | 40,960 | 65,536 | ~5 * elements |
+| `residual_1` | Add | 8,192 | 98,304 | 1 * output_elements |
+| `residual_2` | Add | 8,192 | 98,304 | 1 * output_elements |
+| `k_transpose` | Transpose | ? | 65,536 | shape-only / metadata op |
+</pre></section>
+<aside class="card json"><pre>{
+  &quot;graph&quot;: {
+    &quot;name&quot;: &quot;tiny_transformer_block&quot;,
+    &quot;node_count&quot;: 15,
+    &quot;tensor_count&quot;: 22,
+    &quot;input_count&quot;: 1,
+    &quot;output_count&quot;: 1,
+    &quot;known_flops&quot;: 17186816,
+    &quot;known_bytes&quot;: 1835008
+  },
+  &quot;topology&quot;: {
+    &quot;topological_order&quot;: [
+      &quot;ln1&quot;,
+      &quot;q_proj&quot;,
+      &quot;k_proj&quot;,
+      &quot;v_proj&quot;,
+      &quot;k_transpose&quot;,
+      &quot;qk_scores&quot;,
+      &quot;softmax&quot;,
+      &quot;attn_ctx&quot;,
+      &quot;out_proj&quot;,
+      &quot;residual_1&quot;,
+      &quot;ln2&quot;,
+      &quot;fc1&quot;,
+      &quot;gelu&quot;,
+      &quot;fc2&quot;,
+      &quot;residual_2&quot;
+    ],
+    &quot;depth_by_node&quot;: {
+      &quot;ln1&quot;: 0,
+      &quot;q_proj&quot;: 1,
+      &quot;k_proj&quot;: 1,
+      &quot;v_proj&quot;: 1,
+      &quot;k_transpose&quot;: 2,
+      &quot;qk_scores&quot;: 3,
+      &quot;softmax&quot;: 4,
+      &quot;attn_ctx&quot;: 5,
+      &quot;out_proj&quot;: 6,
+      &quot;residual_1&quot;: 7,
+      &quot;ln2&quot;: 8,
+      &quot;fc1&quot;: 9,
+      &quot;gelu&quot;: 10,
+      &quot;fc2&quot;: 11,
+      &quot;residual_2&quot;: 12
+    },
+    &quot;critical_path&quot;: [
+      &quot;ln1&quot;,
+      &quot;k_proj&quot;,
+      &quot;k_transpose&quot;,
+      &quot;qk_scores&quot;,
+      &quot;softmax&quot;,
+      &quot;attn_ctx&quot;,
+      &quot;out_proj&quot;,
+      &quot;residual_1&quot;,
+      &quot;ln2&quot;,
+      &quot;fc1&quot;,
+      &quot;gelu&quot;,
+      &quot;fc2&quot;,
+      &quot;residual_2&quot;
+    ],
+    &quot;fanout_nodes&quot;: [
+      [
+        &quot;ln1&quot;,
+        3
+      ],
+      [
+        &quot;residual_1&quot;,
+        2
+      ]
+    ],
+    &quot;fanin_nodes&quot;: [
+      [
+        &quot;qk_scores&quot;,
+        2
+      ],
+      [
+        &quot;attn_ctx&quot;,
+        2
+      ],
+      [
+        &quot;residual_2&quot;,
+        2
+      ]
+    ],
+    &quot;source_nodes&quot;: [
+      &quot;ln1&quot;
+    ],
+    &quot;sink_nodes&quot;: [
+      &quot;residual_2&quot;
+    ],
+    &quot;edges&quot;: [
+      [
+        &quot;ln1&quot;,
+        &quot;q_proj&quot;,
+        &quot;ln1_out&quot;
+      ],
+      [
+        &quot;ln1&quot;,
+        &quot;k_proj&quot;,
+        &quot;ln1_out&quot;
+      ],
+      [
+        &quot;ln1&quot;,
+        &quot;v_proj&quot;,
+        &quot;ln1_out&quot;
+      ],
+      [
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;q&quot;
+      ],
+      [
+        &quot;k_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;k&quot;
+      ],
+      [
+        &quot;v_proj&quot;,
+        &quot;attn_ctx&quot;,
+        &quot;v&quot;
+      ],
+      [
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;kt&quot;
+      ],
+      [
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;,
+        &quot;scores&quot;
+      ],
+      [
+        &quot;softmax&quot;,
+        &quot;attn_ctx&quot;,
+        &quot;prob&quot;
+      ],
+      [
+        &quot;attn_ctx&quot;,
+        &quot;out_proj&quot;,
+        &quot;ctx&quot;
+      ],
+      [
+        &quot;out_proj&quot;,
+        &quot;residual_1&quot;,
+        &quot;proj&quot;
+      ],
+      [
+        &quot;residual_1&quot;,
+        &quot;ln2&quot;,
+        &quot;res1&quot;
+      ],
+      [
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;res1&quot;
+      ],
+      [
+        &quot;ln2&quot;,
+        &quot;fc1&quot;,
+        &quot;ln2_out&quot;
+      ],
+      [
+        &quot;fc1&quot;,
+        &quot;gelu&quot;,
+        &quot;fc1&quot;
+      ],
+      [
+        &quot;gelu&quot;,
+        &quot;fc2&quot;,
+        &quot;gelu&quot;
+      ],
+      [
+        &quot;fc2&quot;,
+        &quot;residual_2&quot;,
+        &quot;fc2&quot;
+      ]
+    ]
+  },
+  &quot;shape_params&quot;: [
+    {
+      &quot;key&quot;: &quot;B=1&quot;,
+      &quot;label&quot;: &quot;B&quot;,
+      &quot;dim_value&quot;: 1,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;x&quot;,
+          0
+        ],
+        [
+          &quot;ln1_out&quot;,
+          0
+        ],
+        [
+          &quot;q&quot;,
+          0
+        ],
+        [
+          &quot;k&quot;,
+          0
+        ],
+        [
+          &quot;v&quot;,
+          0
+        ],
+        [
+          &quot;kt&quot;,
+          0
+        ],
+        [
+          &quot;scores&quot;,
+          0
+        ],
+        [
+          &quot;prob&quot;,
+          0
+        ],
+        [
+          &quot;ctx&quot;,
+          0
+        ],
+        [
+          &quot;proj&quot;,
+          0
+        ],
+        [
+          &quot;res1&quot;,
+          0
+        ],
+        [
+          &quot;ln2_out&quot;,
+          0
+        ],
+        [
+          &quot;fc1&quot;,
+          0
+        ],
+        [
+          &quot;gelu&quot;,
+          0
+        ],
+        [
+          &quot;fc2&quot;,
+          0
+        ],
+        [
+          &quot;out&quot;,
+          0
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc1&quot;,
+        &quot;fc2&quot;,
+        &quot;gelu&quot;,
+        &quot;k_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;softmax&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc1&quot;,
+        &quot;fc2&quot;,
+        &quot;gelu&quot;,
+        &quot;k_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;softmax&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;node_count&quot;: 15
+    },
+    {
+      &quot;key&quot;: &quot;S=128&quot;,
+      &quot;label&quot;: &quot;S&quot;,
+      &quot;dim_value&quot;: 128,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;x&quot;,
+          1
+        ],
+        [
+          &quot;ln1_out&quot;,
+          1
+        ],
+        [
+          &quot;q&quot;,
+          1
+        ],
+        [
+          &quot;k&quot;,
+          1
+        ],
+        [
+          &quot;v&quot;,
+          1
+        ],
+        [
+          &quot;scores&quot;,
+          1
+        ],
+        [
+          &quot;prob&quot;,
+          1
+        ],
+        [
+          &quot;ctx&quot;,
+          1
+        ],
+        [
+          &quot;proj&quot;,
+          1
+        ],
+        [
+          &quot;res1&quot;,
+          1
+        ],
+        [
+          &quot;ln2_out&quot;,
+          1
+        ],
+        [
+          &quot;fc1&quot;,
+          1
+        ],
+        [
+          &quot;gelu&quot;,
+          1
+        ],
+        [
+          &quot;fc2&quot;,
+          1
+        ],
+        [
+          &quot;out&quot;,
+          1
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc1&quot;,
+        &quot;fc2&quot;,
+        &quot;gelu&quot;,
+        &quot;k_proj&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;softmax&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc1&quot;,
+        &quot;fc2&quot;,
+        &quot;gelu&quot;,
+        &quot;k_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;softmax&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;node_count&quot;: 15
+    },
+    {
+      &quot;key&quot;: &quot;C=64&quot;,
+      &quot;label&quot;: &quot;C&quot;,
+      &quot;dim_value&quot;: 64,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;x&quot;,
+          2
+        ],
+        [
+          &quot;ln1_out&quot;,
+          2
+        ],
+        [
+          &quot;q&quot;,
+          2
+        ],
+        [
+          &quot;k&quot;,
+          2
+        ],
+        [
+          &quot;v&quot;,
+          2
+        ],
+        [
+          &quot;ctx&quot;,
+          2
+        ],
+        [
+          &quot;proj&quot;,
+          2
+        ],
+        [
+          &quot;res1&quot;,
+          2
+        ],
+        [
+          &quot;ln2_out&quot;,
+          2
+        ],
+        [
+          &quot;fc2&quot;,
+          2
+        ],
+        [
+          &quot;out&quot;,
+          2
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc2&quot;,
+        &quot;k_proj&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;fc1&quot;,
+        &quot;k_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;ln1&quot;,
+        &quot;ln2&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;qk_scores&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;node_count&quot;: 13
+    },
+    {
+      &quot;key&quot;: &quot;M=64&quot;,
+      &quot;label&quot;: &quot;M&quot;,
+      &quot;dim_value&quot;: 64,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;wq&quot;,
+          0
+        ],
+        [
+          &quot;wk&quot;,
+          0
+        ],
+        [
+          &quot;wv&quot;,
+          0
+        ],
+        [
+          &quot;wo&quot;,
+          0
+        ],
+        [
+          &quot;w1&quot;,
+          0
+        ]
+      ],
+      &quot;producer_nodes&quot;: [],
+      &quot;consumer_nodes&quot;: [
+        &quot;fc1&quot;,
+        &quot;k_proj&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;node_count&quot;: 5
+    },
+    {
+      &quot;key&quot;: &quot;N=64&quot;,
+      &quot;label&quot;: &quot;N&quot;,
+      &quot;dim_value&quot;: 64,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;wq&quot;,
+          1
+        ],
+        [
+          &quot;wk&quot;,
+          1
+        ],
+        [
+          &quot;wv&quot;,
+          1
+        ],
+        [
+          &quot;wo&quot;,
+          1
+        ],
+        [
+          &quot;w2&quot;,
+          1
+        ]
+      ],
+      &quot;producer_nodes&quot;: [],
+      &quot;consumer_nodes&quot;: [
+        &quot;fc2&quot;,
+        &quot;k_proj&quot;,
+        &quot;out_proj&quot;,
+        &quot;q_proj&quot;,
+        &quot;v_proj&quot;
+      ],
+      &quot;node_count&quot;: 5
+    },
+    {
+      &quot;key&quot;: &quot;C=128&quot;,
+      &quot;label&quot;: &quot;C&quot;,
+      &quot;dim_value&quot;: 128,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;kt&quot;,
+          2
+        ],
+        [
+          &quot;scores&quot;,
+          2
+        ],
+        [
+          &quot;prob&quot;,
+          2
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;
+      ],
+      &quot;node_count&quot;: 4
+    },
+    {
+      &quot;key&quot;: &quot;C=256&quot;,
+      &quot;label&quot;: &quot;C&quot;,
+      &quot;dim_value&quot;: 256,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;fc1&quot;,
+          2
+        ],
+        [
+          &quot;gelu&quot;,
+          2
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;fc1&quot;,
+        &quot;gelu&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;fc2&quot;,
+        &quot;gelu&quot;
+      ],
+      &quot;node_count&quot;: 3
+    },
+    {
+      &quot;key&quot;: &quot;S=64&quot;,
+      &quot;label&quot;: &quot;S&quot;,
+      &quot;dim_value&quot;: 64,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;kt&quot;,
+          1
+        ]
+      ],
+      &quot;producer_nodes&quot;: [
+        &quot;k_transpose&quot;
+      ],
+      &quot;consumer_nodes&quot;: [
+        &quot;qk_scores&quot;
+      ],
+      &quot;node_count&quot;: 2
+    },
+    {
+      &quot;key&quot;: &quot;M=256&quot;,
+      &quot;label&quot;: &quot;M&quot;,
+      &quot;dim_value&quot;: 256,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;w2&quot;,
+          0
+        ]
+      ],
+      &quot;producer_nodes&quot;: [],
+      &quot;consumer_nodes&quot;: [
+        &quot;fc2&quot;
+      ],
+      &quot;node_count&quot;: 1
+    },
+    {
+      &quot;key&quot;: &quot;N=256&quot;,
+      &quot;label&quot;: &quot;N&quot;,
+      &quot;dim_value&quot;: 256,
+      &quot;tensor_axes&quot;: [
+        [
+          &quot;w1&quot;,
+          1
+        ]
+      ],
+      &quot;producer_nodes&quot;: [],
+      &quot;consumer_nodes&quot;: [
+        &quot;fc1&quot;
+      ],
+      &quot;node_count&quot;: 1
+    }
+  ],
+  &quot;node_costs&quot;: [
+    {
+      &quot;node&quot;: &quot;ln1&quot;,
+      &quot;op_type&quot;: &quot;LayerNormalization&quot;,
+      &quot;flops&quot;: 40960,
+      &quot;bytes_moved&quot;: 65536,
+      &quot;formula&quot;: &quot;~5 * elements&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;q_proj&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 1048576,
+      &quot;bytes_moved&quot;: 81920,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;M=64&quot;,
+        &quot;N=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;k_proj&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 1048576,
+      &quot;bytes_moved&quot;: 81920,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;M=64&quot;,
+        &quot;N=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;v_proj&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 1048576,
+      &quot;bytes_moved&quot;: 81920,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;M=64&quot;,
+        &quot;N=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;k_transpose&quot;,
+      &quot;op_type&quot;: &quot;Transpose&quot;,
+      &quot;flops&quot;: null,
+      &quot;bytes_moved&quot;: 65536,
+      &quot;formula&quot;: &quot;shape-only / metadata op&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=128&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;,
+        &quot;S=64&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;qk_scores&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 2097152,
+      &quot;bytes_moved&quot;: 131072,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=128&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;,
+        &quot;S=64&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;softmax&quot;,
+      &quot;op_type&quot;: &quot;Softmax&quot;,
+      &quot;flops&quot;: 49152,
+      &quot;bytes_moved&quot;: 131072,
+      &quot;formula&quot;: &quot;~3 * elements along softmax axis&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=128&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;attn_ctx&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 2097152,
+      &quot;bytes_moved&quot;: 131072,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=128&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;out_proj&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 1048576,
+      &quot;bytes_moved&quot;: 81920,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;M=64&quot;,
+        &quot;N=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;residual_1&quot;,
+      &quot;op_type&quot;: &quot;Add&quot;,
+      &quot;flops&quot;: 8192,
+      &quot;bytes_moved&quot;: 98304,
+      &quot;formula&quot;: &quot;1 * output_elements&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;ln2&quot;,
+      &quot;op_type&quot;: &quot;LayerNormalization&quot;,
+      &quot;flops&quot;: 40960,
+      &quot;bytes_moved&quot;: 65536,
+      &quot;formula&quot;: &quot;~5 * elements&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;fc1&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 4194304,
+      &quot;bytes_moved&quot;: 229376,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=256&quot;,
+        &quot;C=64&quot;,
+        &quot;M=64&quot;,
+        &quot;N=256&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;gelu&quot;,
+      &quot;op_type&quot;: &quot;Gelu&quot;,
+      &quot;flops&quot;: 262144,
+      &quot;bytes_moved&quot;: 262144,
+      &quot;formula&quot;: &quot;~8 * output_elements activation approximation&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=256&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;fc2&quot;,
+      &quot;op_type&quot;: &quot;MatMul&quot;,
+      &quot;flops&quot;: 4194304,
+      &quot;bytes_moved&quot;: 229376,
+      &quot;formula&quot;: &quot;2 * batch * M * K * N&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=256&quot;,
+        &quot;C=64&quot;,
+        &quot;M=256&quot;,
+        &quot;N=64&quot;,
+        &quot;S=128&quot;
+      ]
+    },
+    {
+      &quot;node&quot;: &quot;residual_2&quot;,
+      &quot;op_type&quot;: &quot;Add&quot;,
+      &quot;flops&quot;: 8192,
+      &quot;bytes_moved&quot;: 98304,
+      &quot;formula&quot;: &quot;1 * output_elements&quot;,
+      &quot;affected_params&quot;: [
+        &quot;B=1&quot;,
+        &quot;C=64&quot;,
+        &quot;S=128&quot;
+      ]
+    }
+  ],
+  &quot;param_impacts&quot;: [
+    {
+      &quot;param&quot;: &quot;B=1&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;ln1&quot;,
+        &quot;q_proj&quot;,
+        &quot;k_proj&quot;,
+        &quot;v_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;,
+        &quot;attn_ctx&quot;,
+        &quot;out_proj&quot;,
+        &quot;residual_1&quot;,
+        &quot;ln2&quot;,
+        &quot;fc1&quot;,
+        &quot;gelu&quot;,
+        &quot;fc2&quot;,
+        &quot;residual_2&quot;
+      ],
+      &quot;known_flops&quot;: 17186816,
+      &quot;known_bytes&quot;: 1835008,
+      &quot;explanation&quot;: &quot;B=1 appears in 16 tensor axes and touches 15 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;S=128&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;ln1&quot;,
+        &quot;q_proj&quot;,
+        &quot;k_proj&quot;,
+        &quot;v_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;,
+        &quot;attn_ctx&quot;,
+        &quot;out_proj&quot;,
+        &quot;residual_1&quot;,
+        &quot;ln2&quot;,
+        &quot;fc1&quot;,
+        &quot;gelu&quot;,
+        &quot;fc2&quot;,
+        &quot;residual_2&quot;
+      ],
+      &quot;known_flops&quot;: 17186816,
+      &quot;known_bytes&quot;: 1835008,
+      &quot;explanation&quot;: &quot;S=128 appears in 15 tensor axes and touches 15 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;C=64&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;ln1&quot;,
+        &quot;q_proj&quot;,
+        &quot;k_proj&quot;,
+        &quot;v_proj&quot;,
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;attn_ctx&quot;,
+        &quot;out_proj&quot;,
+        &quot;residual_1&quot;,
+        &quot;ln2&quot;,
+        &quot;fc1&quot;,
+        &quot;fc2&quot;,
+        &quot;residual_2&quot;
+      ],
+      &quot;known_flops&quot;: 16875520,
+      &quot;known_bytes&quot;: 1441792,
+      &quot;explanation&quot;: &quot;C=64 appears in 11 tensor axes and touches 13 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;C=256&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;fc1&quot;,
+        &quot;gelu&quot;,
+        &quot;fc2&quot;
+      ],
+      &quot;known_flops&quot;: 8650752,
+      &quot;known_bytes&quot;: 720896,
+      &quot;explanation&quot;: &quot;C=256 appears in 2 tensor axes and touches 3 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;M=64&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;q_proj&quot;,
+        &quot;k_proj&quot;,
+        &quot;v_proj&quot;,
+        &quot;out_proj&quot;,
+        &quot;fc1&quot;
+      ],
+      &quot;known_flops&quot;: 8388608,
+      &quot;known_bytes&quot;: 557056,
+      &quot;explanation&quot;: &quot;M=64 appears in 5 tensor axes and touches 5 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;N=64&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;q_proj&quot;,
+        &quot;k_proj&quot;,
+        &quot;v_proj&quot;,
+        &quot;out_proj&quot;,
+        &quot;fc2&quot;
+      ],
+      &quot;known_flops&quot;: 8388608,
+      &quot;known_bytes&quot;: 557056,
+      &quot;explanation&quot;: &quot;N=64 appears in 5 tensor axes and touches 5 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;C=128&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;,
+        &quot;attn_ctx&quot;
+      ],
+      &quot;known_flops&quot;: 4243456,
+      &quot;known_bytes&quot;: 458752,
+      &quot;explanation&quot;: &quot;C=128 appears in 3 tensor axes and touches 4 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;M=256&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;fc2&quot;
+      ],
+      &quot;known_flops&quot;: 4194304,
+      &quot;known_bytes&quot;: 229376,
+      &quot;explanation&quot;: &quot;M=256 appears in 1 tensor axes and touches 1 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;N=256&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;fc1&quot;
+      ],
+      &quot;known_flops&quot;: 4194304,
+      &quot;known_bytes&quot;: 229376,
+      &quot;explanation&quot;: &quot;N=256 appears in 1 tensor axes and touches 1 graph nodes.&quot;
+    },
+    {
+      &quot;param&quot;: &quot;S=64&quot;,
+      &quot;affected_nodes&quot;: [
+        &quot;k_transpose&quot;,
+        &quot;qk_scores&quot;
+      ],
+      &quot;known_flops&quot;: 2097152,
+      &quot;known_bytes&quot;: 196608,
+      &quot;explanation&quot;: &quot;S=64 appears in 1 tensor axes and touches 2 graph nodes.&quot;
+    }
+  ],
+  &quot;subgroups&quot;: [
+    {
+      &quot;name&quot;: &quot;AttentionCore:softmax&quot;,
+      &quot;kind&quot;: &quot;attention&quot;,
+      &quot;nodes&quot;: [
+        &quot;attn_ctx&quot;,
+        &quot;qk_scores&quot;,
+        &quot;softmax&quot;
+      ],
+      &quot;reason&quot;: &quot;MatMul/Gemm -&gt; Softmax -&gt; MatMul/Gemm motif&quot;
+    },
+    {
+      &quot;name&quot;: &quot;LinearChain:ln2..fc2&quot;,
+      &quot;kind&quot;: &quot;chain&quot;,
+      &quot;nodes&quot;: [
+        &quot;ln2&quot;,
+        &quot;fc1&quot;,
+        &quot;gelu&quot;,
+        &quot;fc2&quot;
+      ],
+      &quot;reason&quot;: &quot;Long single-producer/single-consumer chain&quot;
+    },
+    {
+      &quot;name&quot;: &quot;LinearBias&quot;,
+      &quot;kind&quot;: &quot;pattern&quot;,
+      &quot;nodes&quot;: [
+        &quot;out_proj&quot;,
+        &quot;residual_1&quot;
+      ],
+      &quot;reason&quot;: &quot;Matched op pattern LinearBias&quot;
+    },
+    {
+      &quot;name&quot;: &quot;LinearBias&quot;,
+      &quot;kind&quot;: &quot;pattern&quot;,
+      &quot;nodes&quot;: [
+        &quot;fc2&quot;,
+        &quot;residual_2&quot;
+      ],
+      &quot;reason&quot;: &quot;Matched op pattern LinearBias&quot;
+    },
+    {
+      &quot;name&quot;: &quot;NormThenLinear&quot;,
+      &quot;kind&quot;: &quot;pattern&quot;,
+      &quot;nodes&quot;: [
+        &quot;ln2&quot;,
+        &quot;fc1&quot;
+      ],
+      &quot;reason&quot;: &quot;Matched op pattern NormThenLinear&quot;
+    },
+    {
+      &quot;name&quot;: &quot;ResidualJoin:residual_2&quot;,
+      &quot;kind&quot;: &quot;residual&quot;,
+      &quot;nodes&quot;: [
+        &quot;fc2&quot;,
+        &quot;residual_1&quot;,
+        &quot;residual_2&quot;
+      ],
+      &quot;reason&quot;: &quot;Add/Sum node merges multiple producer branches&quot;
+    }
+  ],
+  &quot;recommendations&quot;: [
+    &quot;What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.&quot;,
+    &quot;Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.&quot;,
+    &quot;Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.&quot;,
+    &quot;Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.&quot;,
+    &quot;Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.&quot;,
+    &quot;1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose.&quot;
+  ],
+  &quot;what_if&quot;: [
+    {
+      &quot;overrides&quot;: {
+        &quot;S&quot;: 256
+      },
+      &quot;known_flops_before&quot;: 17186816,
+      &quot;known_flops_after&quot;: 34373632,
+      &quot;known_flops_delta&quot;: 17186816,
+      &quot;known_flops_ratio&quot;: 2.0,
+      &quot;known_bytes_before&quot;: 1835008,
+      &quot;known_bytes_after&quot;: 3604480,
+      &quot;known_bytes_delta&quot;: 1769472,
+      &quot;changed_node_count&quot;: 15,
+      &quot;top_changed_nodes&quot;: [
+        {
+          &quot;node&quot;: &quot;fc1&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 4194304,
+          &quot;flops_after&quot;: 8388608,
+          &quot;flops_delta&quot;: 4194304,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 229376,
+          &quot;bytes_after&quot;: 393216,
+          &quot;bytes_delta&quot;: 163840
+        },
+        {
+          &quot;node&quot;: &quot;fc2&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 4194304,
+          &quot;flops_after&quot;: 8388608,
+          &quot;flops_delta&quot;: 4194304,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 229376,
+          &quot;bytes_after&quot;: 393216,
+          &quot;bytes_delta&quot;: 163840
+        },
+        {
+          &quot;node&quot;: &quot;qk_scores&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 2097152,
+          &quot;flops_after&quot;: 4194304,
+          &quot;flops_delta&quot;: 2097152,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 131072,
+          &quot;bytes_after&quot;: 327680,
+          &quot;bytes_delta&quot;: 196608
+        },
+        {
+          &quot;node&quot;: &quot;attn_ctx&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 2097152,
+          &quot;flops_after&quot;: 4194304,
+          &quot;flops_delta&quot;: 2097152,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 131072,
+          &quot;bytes_after&quot;: 262144,
+          &quot;bytes_delta&quot;: 131072
+        },
+        {
+          &quot;node&quot;: &quot;q_proj&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 1048576,
+          &quot;flops_after&quot;: 2097152,
+          &quot;flops_delta&quot;: 1048576,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 81920,
+          &quot;bytes_after&quot;: 147456,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;k_proj&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 1048576,
+          &quot;flops_after&quot;: 2097152,
+          &quot;flops_delta&quot;: 1048576,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 81920,
+          &quot;bytes_after&quot;: 147456,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;v_proj&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 1048576,
+          &quot;flops_after&quot;: 2097152,
+          &quot;flops_delta&quot;: 1048576,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 81920,
+          &quot;bytes_after&quot;: 147456,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;out_proj&quot;,
+          &quot;op_type&quot;: &quot;MatMul&quot;,
+          &quot;flops_before&quot;: 1048576,
+          &quot;flops_after&quot;: 2097152,
+          &quot;flops_delta&quot;: 1048576,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 81920,
+          &quot;bytes_after&quot;: 147456,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;gelu&quot;,
+          &quot;op_type&quot;: &quot;Gelu&quot;,
+          &quot;flops_before&quot;: 262144,
+          &quot;flops_after&quot;: 524288,
+          &quot;flops_delta&quot;: 262144,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 262144,
+          &quot;bytes_after&quot;: 524288,
+          &quot;bytes_delta&quot;: 262144
+        },
+        {
+          &quot;node&quot;: &quot;softmax&quot;,
+          &quot;op_type&quot;: &quot;Softmax&quot;,
+          &quot;flops_before&quot;: 49152,
+          &quot;flops_after&quot;: 98304,
+          &quot;flops_delta&quot;: 49152,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 131072,
+          &quot;bytes_after&quot;: 262144,
+          &quot;bytes_delta&quot;: 131072
+        },
+        {
+          &quot;node&quot;: &quot;ln1&quot;,
+          &quot;op_type&quot;: &quot;LayerNormalization&quot;,
+          &quot;flops_before&quot;: 40960,
+          &quot;flops_after&quot;: 81920,
+          &quot;flops_delta&quot;: 40960,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 65536,
+          &quot;bytes_after&quot;: 131072,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;ln2&quot;,
+          &quot;op_type&quot;: &quot;LayerNormalization&quot;,
+          &quot;flops_before&quot;: 40960,
+          &quot;flops_after&quot;: 81920,
+          &quot;flops_delta&quot;: 40960,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 65536,
+          &quot;bytes_after&quot;: 131072,
+          &quot;bytes_delta&quot;: 65536
+        },
+        {
+          &quot;node&quot;: &quot;residual_1&quot;,
+          &quot;op_type&quot;: &quot;Add&quot;,
+          &quot;flops_before&quot;: 8192,
+          &quot;flops_after&quot;: 16384,
+          &quot;flops_delta&quot;: 8192,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 98304,
+          &quot;bytes_after&quot;: 196608,
+          &quot;bytes_delta&quot;: 98304
+        },
+        {
+          &quot;node&quot;: &quot;residual_2&quot;,
+          &quot;op_type&quot;: &quot;Add&quot;,
+          &quot;flops_before&quot;: 8192,
+          &quot;flops_after&quot;: 16384,
+          &quot;flops_delta&quot;: 8192,
+          &quot;flops_ratio&quot;: 2.0,
+          &quot;bytes_before&quot;: 98304,
+          &quot;bytes_after&quot;: 196608,
+          &quot;bytes_delta&quot;: 98304
+        },
+        {
+          &quot;node&quot;: &quot;k_transpose&quot;,
+          &quot;op_type&quot;: &quot;Transpose&quot;,
+          &quot;flops_before&quot;: null,
+          &quot;flops_after&quot;: null,
+          &quot;flops_delta&quot;: null,
+          &quot;flops_ratio&quot;: null,
+          &quot;bytes_before&quot;: 65536,
+          &quot;bytes_after&quot;: 196608,
+          &quot;bytes_delta&quot;: 131072
+        }
+      ]
+    }
+  ]
+}</pre></aside>
+</main>
+</body>
+</html>
