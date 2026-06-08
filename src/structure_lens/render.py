@@ -110,6 +110,110 @@ def _table(headers: list[str], rows: list[list[Any]]) -> str:
     return f"<div class=\"table-wrap\"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>"
 
 
+
+def _node_op_map(report: dict[str, Any]) -> dict[str, str]:
+    return {c["node"]: c["op_type"] for c in report.get("node_costs", [])}
+
+
+def _group_node_lookup(groups: list[dict[str, Any]]) -> dict[str, str]:
+    """Map a node to the first clickable subgroup that owns it.
+
+    This is intentionally a simple UI ownership map. The raw report can contain
+    overlapping motif groups; for graph navigation we prefer earlier/larger
+    topology groups while preserving the exact groups in chips and detail panes.
+    """
+
+    owner: dict[str, str] = {}
+    group_candidates = [g for g in groups if g["id"].startswith("subgroup:")]
+    group_candidates.sort(key=lambda g: (-len(g.get("nodes", [])), g["kind"], g["title"]))
+    for group in group_candidates:
+        for node in group.get("nodes", []):
+            owner.setdefault(node, group["id"])
+    return owner
+
+
+def _node_graph_data(report: dict[str, Any], nodes: list[str] | None = None) -> dict[str, Any]:
+    topo = report["topology"]
+    op_by_node = _node_op_map(report)
+    selected = set(nodes or topo["topological_order"])
+    order = [n for n in topo["topological_order"] if n in selected]
+    depth = topo["depth_by_node"]
+    edges = [
+        {"src": src, "dst": dst, "tensor": tensor}
+        for src, dst, tensor in topo["edges"]
+        if src in selected and dst in selected
+    ]
+    return {
+        "nodes": [{"name": n, "op_type": op_by_node.get(n, "?"), "depth": depth.get(n, 0)} for n in order],
+        "edges": edges,
+    }
+
+
+def _attach_node_graphs(report: dict[str, Any], groups: list[dict[str, Any]]) -> None:
+    for group in groups:
+        nodes = group.get("nodes")
+        if group["id"] == "topology:overview":
+            group["node_graph"] = _node_graph_data(report)
+        elif nodes:
+            group["node_graph"] = _node_graph_data(report, nodes)
+
+
+def _node_graph_positions(graph: dict[str, Any]) -> dict[str, tuple[int, int]]:
+    by_depth: dict[int, list[str]] = {}
+    for node in graph.get("nodes", []):
+        by_depth.setdefault(int(node.get("depth", 0)), []).append(node["name"])
+    positions: dict[str, tuple[int, int]] = {}
+    min_depth = min(by_depth, default=0)
+    for depth, names in by_depth.items():
+        for lane, name in enumerate(names):
+            positions[name] = (90 + (depth - min_depth) * 150, 70 + lane * 82)
+    return positions
+
+
+def _render_node_graph_svg(
+    graph: dict[str, Any],
+    *,
+    svg_id: str,
+    aria_label: str,
+    group_owner: dict[str, str] | None = None,
+    node_class: str = "topo-node",
+) -> str:
+    if not graph.get("nodes"):
+        return ""
+    positions = _node_graph_positions(graph)
+    max_x = max((x for x, _ in positions.values()), default=900) + 110
+    max_y = max((y for _, y in positions.values()), default=260) + 70
+    group_owner = group_owner or {}
+    edge_svg = []
+    for edge in graph.get("edges", []):
+        src = edge["src"]
+        dst = edge["dst"]
+        if src not in positions or dst not in positions:
+            continue
+        x1, y1 = positions[src]
+        x2, y2 = positions[dst]
+        mid = (x1 + x2) // 2
+        attr = f'{_h(src)}->{_h(dst)}'
+        edge_svg.append(
+            f'<path class="topo-edge" data-topology-edge="{attr}" data-node-edge="{attr}" data-overview-edge="{attr}" '
+            f'd="M{x1+54},{y1} C{mid},{y1} {mid},{y2} {x2-54},{y2}" />'
+            f'<text class="edge-label" x="{mid}" y="{(y1+y2)//2 - 5}">{_h(edge.get("tensor", ""))}</text>'
+        )
+    node_svg = []
+    by_name = {n["name"]: n for n in graph.get("nodes", [])}
+    for name, (x, y) in positions.items():
+        node = by_name[name]
+        target = group_owner.get(name, "topology:overview")
+        node_svg.append(
+            f'<g class="{node_class}" data-group-id="{_h(target)}" data-node-name="{_h(name)}" tabindex="0">'
+            f'<rect x="{x-54}" y="{y-26}" width="108" height="52" rx="12" />'
+            f'<text class="node-title" x="{x}" y="{y-4}">{_h(name[:16])}</text>'
+            f'<text class="node-subtitle" x="{x}" y="{y+15}">{_h(node.get("op_type", "?"))}</text>'
+            f'</g>'
+        )
+    return f'<svg id="{_h(svg_id)}" class="topology-svg" viewBox="0 0 {max_x} {max_y}" role="img" aria-label="{_h(aria_label)}">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
+
+
 def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
     g = report["graph"]
     topo = report["topology"]
@@ -193,14 +297,19 @@ def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
                     },
                 }
             )
+    used_ids: dict[str, int] = {}
     for s in report["subgroups"]:
         related_costs = [c for c in report["node_costs"] if c["node"] in set(s["nodes"])]
+        base_id = f"subgroup:{s['name']}"
+        used_ids[base_id] = used_ids.get(base_id, 0) + 1
+        group_id = base_id if used_ids[base_id] == 1 else f"{base_id}#{used_ids[base_id]}"
         groups.append(
             {
-                "id": f"subgroup:{s['name']}",
+                "id": group_id,
                 "title": s["name"],
                 "kind": s["kind"],
                 "summary": s["reason"],
+                "nodes": list(s["nodes"]),
                 "metrics": {"Nodes": len(s["nodes"]), "Known FLOPs": sum(c["flops"] or 0 for c in related_costs)},
                 "items": ["Nodes: " + ", ".join(s["nodes"])],
                 "table": {
@@ -209,6 +318,7 @@ def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
                 },
             }
         )
+    _attach_node_graphs(report, groups)
     return groups
 
 
@@ -218,7 +328,15 @@ def _render_static_detail(group: dict[str, Any]) -> str:
     table = ""
     if group.get("table"):
         table = _table(group["table"]["headers"], group["table"]["rows"])
-    return f"<section class=\"detail-card\"><h3>{_h(group['title'])}</h3><p>{_h(group['summary'])}</p><div class=\"metrics\">{metrics}</div>{'<ul>'+items+'</ul>' if items else ''}{table}</section>"
+    node_graph = ""
+    if group.get("node_graph"):
+        node_graph = '<h4>internal node graph</h4>' + _render_node_graph_svg(
+            group["node_graph"],
+            svg_id=f"detail-node-graph-{group['id']}",
+            aria_label=f"Internal graph for {group['title']}",
+            node_class="mini-node",
+        )
+    return f"<section class=\"detail-card\"><h3>{_h(group['title'])}</h3><p>{_h(group['summary'])}</p><div class=\"metrics\">{metrics}</div>{node_graph}{'<ul>'+items+'</ul>' if items else ''}{table}</section>"
 
 
 def _graph_positions(groups: list[dict[str, Any]]) -> dict[str, tuple[int, int]]:
@@ -269,6 +387,8 @@ def _render_group_graph(groups: list[dict[str, Any]]) -> str:
 
 def render_html(report: dict[str, Any]) -> str:
     groups = _build_group_data(report)
+    group_owner = _group_node_lookup(groups)
+    overview_graph = _render_node_graph_svg(_node_graph_data(report), svg_id="overview-graph", aria_label="Topology overview graph", group_owner=group_owner)
     payload = json.dumps({"report": report, "groups": groups}, ensure_ascii=False).replace("</", "<\\/")
     initial_detail = _render_static_detail(groups[0])
     graph = report["graph"]
@@ -293,9 +413,17 @@ main {{ padding:18px; max-width:1380px; margin:0 auto; }}
 .grid {{ display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(360px, .8fr); gap:18px; align-items:start; }}
 .card, .detail-card {{ background:linear-gradient(180deg, #111d31, #0d1728); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 14px 40px #0007; }}
 .card h2, .detail-card h3 {{ margin:0 0 10px; }}
-.graph-card {{ overflow:auto; }}
+.graph-card {{ overflow:auto; grid-column:1 / -1; }}
 #overview-graph {{ min-width:900px; width:100%; height:auto; display:block; }}
 .edge {{ stroke:#39536f; stroke-width:2; opacity:.9; }}
+.topology-svg {{ min-width:900px; width:100%; height:auto; display:block; }}
+.topo-edge {{ fill:none; stroke:#496580; stroke-width:2; opacity:.9; }}
+.edge-label {{ fill:#88a2bd; font-size:10px; paint-order:stroke; stroke:#08111f; stroke-width:4px; stroke-linejoin:round; }}
+.topo-node, .mini-node {{ cursor:pointer; outline:none; }}
+.topo-node rect, .mini-node rect {{ fill:#13223a; stroke:#3b5d7d; stroke-width:1.3; filter: drop-shadow(0 7px 10px #0007); }}
+.topo-node:hover rect, .topo-node.active rect, .mini-node:hover rect, .mini-node.active rect {{ fill:#173456; stroke:#7dd3fc; }}
+.mini-node rect {{ fill:#102033; }}
+.detail-card h4 {{ margin:16px 0 8px; color:#bfdbfe; }}
 .node {{ cursor:pointer; outline:none; }}
 .node rect {{ fill:#13223a; stroke:#3b5d7d; stroke-width:1.5; filter: drop-shadow(0 8px 12px #0008); transition:fill .15s, stroke .15s, transform .15s; }}
 .node:hover rect, .node.active rect {{ fill:#173456; stroke:#7dd3fc; }}
@@ -338,9 +466,9 @@ ul {{ padding-left:20px; color:#d5e3f3; }}
 <main>
 <section class="grid">
   <article class="card graph-card">
-    <h2>Group overview graph</h2>
-    <p>Click a large category or detected subgroup. The detail view updates below/right with tables and node-level information.</p>
-    {_render_group_graph(groups)}
+    <h2>Topology-aware overview graph</h2>
+    <p>Edges follow producer → consumer tensor topology. Click a node to open its detected subgroup/detail pane; use chips for other report sections.</p>
+    {overview_graph}
     <div class="chips">{chips}</div>
   </article>
   <aside id="detail-view" class="detail-card">{initial_detail}</aside>
@@ -370,6 +498,34 @@ function renderTable(table) {{
 function renderMetrics(metrics) {{
   return Object.entries(metrics || {{}}).map(([k,v]) => `<span class="metric"><b>${{esc(k)}}</b><em>${{esc(fmt(v))}}</em></span>`).join('');
 }}
+function renderNodeGraph(graph) {{
+  if (!graph || !graph.nodes || !graph.nodes.length) return '';
+  const byDepth = new Map();
+  graph.nodes.forEach(n => {{
+    const depth = Number(n.depth || 0);
+    if (!byDepth.has(depth)) byDepth.set(depth, []);
+    byDepth.get(depth).push(n);
+  }});
+  const pos = new Map();
+  const minDepth = Math.min(...[...byDepth.keys()], 0);
+  [...byDepth.entries()].forEach(([depth, nodes]) => {{
+    nodes.forEach((n, lane) => pos.set(n.name, {{x: 70 + (depth - minDepth) * 130, y: 54 + lane * 74}}));
+  }});
+  const maxX = Math.max(...[...pos.values()].map(p => p.x), 720) + 90;
+  const maxY = Math.max(...[...pos.values()].map(p => p.y), 180) + 58;
+  const paths = (graph.edges || []).map(e => {{
+    const a = pos.get(e.src), b = pos.get(e.dst);
+    if (!a || !b) return '';
+    const mid = Math.round((a.x + b.x) / 2);
+    const edgeId = `${{e.src}}->${{e.dst}}`;
+    return `<path class="topo-edge" data-node-edge="${{esc(edgeId)}}" d="M${{a.x+46}},${{a.y}} C${{mid}},${{a.y}} ${{mid}},${{b.y}} ${{b.x-46}},${{b.y}}" />`;
+  }}).join('');
+  const nodes = graph.nodes.map(n => {{
+    const p = pos.get(n.name);
+    return `<g class="mini-node" data-node-name="${{esc(n.name)}}"><rect x="${{p.x-46}}" y="${{p.y-23}}" width="92" height="46" rx="10" /><text class="node-title" x="${{p.x}}" y="${{p.y-3}}">${{esc(n.name)}}</text><text class="node-subtitle" x="${{p.x}}" y="${{p.y+14}}">${{esc(n.op_type || '?')}}</text></g>`;
+  }}).join('');
+  return `<h4>internal node graph</h4><svg class="topology-svg" viewBox="0 0 ${{maxX}} ${{maxY}}" role="img" aria-label="internal node graph">${{paths}}${{nodes}}</svg>`;
+}}
 function selectGroup(id) {{
   const g = groups.get(id);
   if (!g) return;
@@ -379,6 +535,7 @@ function selectGroup(id) {{
     <h3>${{esc(g.title)}}</h3>
     <p>${{esc(g.summary)}}</p>
     <div class="metrics">${{renderMetrics(g.metrics)}}</div>
+    ${{renderNodeGraph(g.node_graph)}}
     ${{items ? `<ul>${{items}}</ul>` : ''}}
     ${{renderTable(g.table)}}
   `;

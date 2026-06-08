@@ -52,6 +52,18 @@ class StructureLensAnalysisTests(unittest.TestCase):
         self.assertIn('<table', doc)
         self.assertNotIn('| Param | Dim | Tensor axes | Nodes touched |', doc)
 
+    def test_html_overview_and_detail_graphs_follow_topology_edges(self):
+        from structure_lens.render import render_html
+
+        report = analyze_model("examples/tiny_transformer_block.json", what_if={"S": 256}).to_dict()
+        doc = render_html(report)
+        self.assertIn('id="overview-graph"', doc)
+        self.assertIn('data-topology-edge="ln1->q_proj"', doc)
+        self.assertIn('data-overview-edge', doc)
+        self.assertIn('internal node graph', doc)
+        self.assertIn('data-node-edge="qk_scores->softmax"', doc)
+        self.assertIn('data-node-edge="softmax->attn_ctx"', doc)
+
 
 if __name__ == "__main__":
     unittest.main()
