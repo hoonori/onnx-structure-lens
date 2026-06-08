@@ -2,130 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Structure Lens: tiny_transformer_block</title>
 <style>
-:root { color-scheme: dark; }
-body { margin:0; background:#0b1020; color:#dbeafe; font:14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
-header { position:sticky; top:0; background:#111827ee; backdrop-filter: blur(8px); padding:18px 28px; border-bottom:1px solid #334155; }
-h1 { margin:0; font-size:22px; }
-main { display:grid; grid-template-columns: minmax(0, 1.3fr) minmax(380px, .7fr); gap:20px; padding:24px; }
-.card { background:#111827; border:1px solid #334155; border-radius:16px; padding:18px; box-shadow: 0 8px 30px #0004; }
-pre { white-space:pre-wrap; word-break:break-word; margin:0; }
-.json { max-height:80vh; overflow:auto; color:#bfdbfe; }
-.badge { display:inline-block; margin-right:12px; color:#93c5fd; }
+:root { color-scheme: dark; --bg:#08111f; --panel:#101b2e; --panel2:#0d1627; --line:#334155; --text:#e5eefb; --muted:#93a4bb; --accent:#60a5fa; --good:#34d399; --warn:#fbbf24; --pink:#f472b6; --purple:#a78bfa; }
+* { box-sizing:border-box; }
+body { margin:0; background:radial-gradient(circle at 20% 0%, #13284a 0, var(--bg) 42%); color:var(--text); font:14px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
+header { position:sticky; top:0; z-index:10; background:#08111fe8; backdrop-filter: blur(10px); padding:16px 22px; border-bottom:1px solid var(--line); }
+h1 { margin:0 0 8px; font-size:22px; }
+.badge { display:inline-flex; gap:6px; align-items:center; margin:0 8px 6px 0; padding:5px 10px; border:1px solid #315071; border-radius:999px; color:#bfdbfe; background:#0b1d33; }
+main { padding:18px; max-width:1380px; margin:0 auto; }
+.grid { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(360px, .8fr); gap:18px; align-items:start; }
+.card, .detail-card { background:linear-gradient(180deg, #111d31, #0d1728); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 14px 40px #0007; }
+.card h2, .detail-card h3 { margin:0 0 10px; }
+.graph-card { overflow:auto; }
+#overview-graph { min-width:900px; width:100%; height:auto; display:block; }
+.edge { stroke:#39536f; stroke-width:2; opacity:.9; }
+.node { cursor:pointer; outline:none; }
+.node rect { fill:#13223a; stroke:#3b5d7d; stroke-width:1.5; filter: drop-shadow(0 8px 12px #0008); transition:fill .15s, stroke .15s, transform .15s; }
+.node:hover rect, .node.active rect { fill:#173456; stroke:#7dd3fc; }
+.node.model rect { fill:#172554; stroke:#60a5fa; }
+.node.topology rect { fill:#123524; stroke:#34d399; }
+.node.shape rect { fill:#33245d; stroke:#a78bfa; }
+.node.impact rect, .node.cost rect { fill:#442817; stroke:#fbbf24; }
+.node.whatif rect { fill:#4a1635; stroke:#f472b6; }
+.node.attention rect { fill:#3b1f54; stroke:#c084fc; }
+.node.residual rect { fill:#482121; stroke:#fb7185; }
+.node text { text-anchor:middle; pointer-events:none; }
+.node-title { fill:#f8fafc; font-weight:700; font-size:13px; }
+.node-subtitle { fill:#a9bdd4; font-size:11px; text-transform:uppercase; letter-spacing:.07em; }
+.chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.chip { border:1px solid #38516e; background:#0b1d33; color:#dbeafe; border-radius:999px; padding:7px 10px; cursor:pointer; }
+.chip:hover { border-color:#7dd3fc; color:white; }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:12px 0; }
+.metric { display:block; padding:10px; border:1px solid #2e4661; background:#0b1829; border-radius:12px; }
+.metric b { display:block; color:#9fb4cc; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.metric em { display:block; color:#f8fafc; font-style:normal; font-size:18px; font-weight:750; }
+.table-wrap { overflow:auto; margin-top:12px; border:1px solid #2d435c; border-radius:12px; }
+table { width:100%; border-collapse:collapse; min-width:520px; }
+th, td { padding:8px 10px; border-bottom:1px solid #23374f; vertical-align:top; }
+th { position:sticky; top:0; background:#13223a; color:#bfdbfe; text-align:left; }
+td { color:#dbeafe; }
+ul { padding-left:20px; color:#d5e3f3; }
+.raw-json { margin-top:18px; }
+.raw-json summary { cursor:pointer; color:#93c5fd; }
+.raw-json pre { white-space:pre-wrap; max-height:360px; overflow:auto; background:#07101d; padding:14px; border-radius:12px; }
+@media (max-width: 900px) { .grid { grid-template-columns:1fr; } header { position:static; } main { padding:12px; } .card, .detail-card { border-radius:14px; } }
 </style>
 </head>
 <body>
 <header>
 <h1>Structure Lens: tiny_transformer_block</h1>
-<span class="badge">nodes 15</span>
-<span class="badge">known FLOPs 17,186,816</span>
-<span class="badge">subgroups 6</span>
+<span class="badge">nodes <b>15</b></span>
+<span class="badge">known FLOPs <b>17,186,816</b></span>
+<span class="badge">subgroups <b>6</b></span>
 </header>
 <main>
-<section class="card"><pre># Structure Lens Report: tiny_transformer_block
-
-## Summary
-- Nodes: **15**
-- Tensors: **22**
-- Known FLOPs proxy: **17,186,816**
-- Known bytes moved proxy: **1,835,008**
-
-## Recommendations
-- What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.
-- Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.
-- Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.
-- Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.
-- Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.
-- 1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose.
-
-## Topology
-- Source nodes: ln1
-- Sink nodes: residual_2
-- Critical path length: 13
-- Critical path: ln1 → k_proj → k_transpose → qk_scores → softmax → attn_ctx → out_proj → residual_1 → ln2 → fc1 → gelu → fc2 → residual_2
-- Top fanout nodes: ln1(3), residual_1(2)
-- Top fanin nodes: qk_scores(2), attn_ctx(2), residual_2(2)
-
-## Shape / Hyperparameter Linkage
-| Param | Dim | Tensor axes | Nodes touched |
-|---|---:|---:|---:|
-| `B=1` | `1` | 16 | 15 |
-| `S=128` | `128` | 15 | 15 |
-| `C=64` | `64` | 11 | 13 |
-| `M=64` | `64` | 5 | 5 |
-| `N=64` | `64` | 5 | 5 |
-| `C=128` | `128` | 3 | 4 |
-| `C=256` | `256` | 2 | 3 |
-| `S=64` | `64` | 1 | 2 |
-| `M=256` | `256` | 1 | 1 |
-| `N=256` | `256` | 1 | 1 |
-
-## Parameter Impact
-| Param | Affected nodes | Known FLOPs | Known bytes |
-|---|---:|---:|---:|
-| `B=1` | 15 | 17,186,816 | 1,835,008 |
-| `S=128` | 15 | 17,186,816 | 1,835,008 |
-| `C=64` | 13 | 16,875,520 | 1,441,792 |
-| `C=256` | 3 | 8,650,752 | 720,896 |
-| `M=64` | 5 | 8,388,608 | 557,056 |
-| `N=64` | 5 | 8,388,608 | 557,056 |
-| `C=128` | 4 | 4,243,456 | 458,752 |
-| `M=256` | 1 | 4,194,304 | 229,376 |
-| `N=256` | 1 | 4,194,304 | 229,376 |
-| `S=64` | 2 | 2,097,152 | 196,608 |
-
-## What-if Analysis
-### `S=256`
-- Known FLOPs: 17,186,816 → 34,373,632 (+17,186,816, 2.00x)
-- Known bytes: 1,835,008 → 3,604,480 (+1,769,472)
-- Changed nodes: 15
-| Node | Op | FLOPs before | FLOPs after | Delta | Ratio |
-|---|---|---:|---:|---:|---:|
-| `fc1` | MatMul | 4,194,304 | 8,388,608 | +4,194,304 | 2.00x |
-| `fc2` | MatMul | 4,194,304 | 8,388,608 | +4,194,304 | 2.00x |
-| `qk_scores` | MatMul | 2,097,152 | 4,194,304 | +2,097,152 | 2.00x |
-| `attn_ctx` | MatMul | 2,097,152 | 4,194,304 | +2,097,152 | 2.00x |
-| `q_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
-| `k_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
-| `v_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
-| `out_proj` | MatMul | 1,048,576 | 2,097,152 | +1,048,576 | 2.00x |
-| `gelu` | Gelu | 262,144 | 524,288 | +262,144 | 2.00x |
-| `softmax` | Softmax | 49,152 | 98,304 | +49,152 | 2.00x |
-| `ln1` | LayerNormalization | 40,960 | 81,920 | +40,960 | 2.00x |
-| `ln2` | LayerNormalization | 40,960 | 81,920 | +40,960 | 2.00x |
-| `residual_1` | Add | 8,192 | 16,384 | +8,192 | 2.00x |
-| `residual_2` | Add | 8,192 | 16,384 | +8,192 | 2.00x |
-| `k_transpose` | Transpose | ? | ? | ? | ? |
-
-## Detected Subgroups
-- **AttentionCore:softmax** (`attention`): attn_ctx, qk_scores, softmax — MatMul/Gemm -&gt; Softmax -&gt; MatMul/Gemm motif
-- **LinearChain:ln2..fc2** (`chain`): ln2, fc1, gelu, fc2 — Long single-producer/single-consumer chain
-- **LinearBias** (`pattern`): out_proj, residual_1 — Matched op pattern LinearBias
-- **LinearBias** (`pattern`): fc2, residual_2 — Matched op pattern LinearBias
-- **NormThenLinear** (`pattern`): ln2, fc1 — Matched op pattern NormThenLinear
-- **ResidualJoin:residual_2** (`residual`): fc2, residual_1, residual_2 — Add/Sum node merges multiple producer branches
-
-## Top Node Costs
-| Node | Op | FLOPs | Bytes | Formula |
-|---|---|---:|---:|---|
-| `fc1` | MatMul | 4,194,304 | 229,376 | 2 * batch * M * K * N |
-| `fc2` | MatMul | 4,194,304 | 229,376 | 2 * batch * M * K * N |
-| `qk_scores` | MatMul | 2,097,152 | 131,072 | 2 * batch * M * K * N |
-| `attn_ctx` | MatMul | 2,097,152 | 131,072 | 2 * batch * M * K * N |
-| `q_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
-| `k_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
-| `v_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
-| `out_proj` | MatMul | 1,048,576 | 81,920 | 2 * batch * M * K * N |
-| `gelu` | Gelu | 262,144 | 262,144 | ~8 * output_elements activation approximation |
-| `softmax` | Softmax | 49,152 | 131,072 | ~3 * elements along softmax axis |
-| `ln1` | LayerNormalization | 40,960 | 65,536 | ~5 * elements |
-| `ln2` | LayerNormalization | 40,960 | 65,536 | ~5 * elements |
-| `residual_1` | Add | 8,192 | 98,304 | 1 * output_elements |
-| `residual_2` | Add | 8,192 | 98,304 | 1 * output_elements |
-| `k_transpose` | Transpose | ? | 65,536 | shape-only / metadata op |
-</pre></section>
-<aside class="card json"><pre>{
+<section class="grid">
+  <article class="card graph-card">
+    <h2>Group overview graph</h2>
+    <p>Click a large category or detected subgroup. The detail view updates below/right with tables and node-level information.</p>
+    <svg id="overview-graph" viewBox="0 0 1120 570" role="img" aria-label="Group overview graph"><line class="edge" x1="520" y1="104" x2="178" y2="176" /><line class="edge" x1="520" y1="104" x2="374" y2="176" /><line class="edge" x1="520" y1="104" x2="570" y2="176" /><line class="edge" x1="520" y1="104" x2="766" y2="176" /><line class="edge" x1="520" y1="104" x2="962" y2="176" /><line class="edge" x1="570" y1="244" x2="220" y2="326" /><line class="edge" x1="570" y1="244" x2="520" y2="326" /><line class="edge" x1="570" y1="244" x2="220" y2="441" /><line class="edge" x1="570" y1="244" x2="520" y2="441" /><line class="edge" x1="570" y1="244" x2="820" y2="441" /><g class="node model" data-group-id="model:summary" tabindex="0"><rect x="425" y="36" width="190" height="68" rx="14" /><text class="node-title" x="520" y="65">Model Summary</text><text class="node-subtitle" x="520" y="87">model</text></g><g class="node topology" data-group-id="topology:overview" tabindex="0"><rect x="83" y="176" width="190" height="68" rx="14" /><text class="node-title" x="178" y="205">Topology</text><text class="node-subtitle" x="178" y="227">topology</text></g><g class="node shape" data-group-id="shape:params" tabindex="0"><rect x="279" y="176" width="190" height="68" rx="14" /><text class="node-title" x="374" y="205">Shape Params</text><text class="node-subtitle" x="374" y="227">shape</text></g><g class="node impact" data-group-id="impact:params" tabindex="0"><rect x="475" y="176" width="190" height="68" rx="14" /><text class="node-title" x="570" y="205">Param Impact</text><text class="node-subtitle" x="570" y="227">impact</text></g><g class="node cost" data-group-id="cost:nodes" tabindex="0"><rect x="671" y="176" width="190" height="68" rx="14" /><text class="node-title" x="766" y="205">Node Costs</text><text class="node-subtitle" x="766" y="227">cost</text></g><g class="node whatif" data-group-id="whatif:S=256" tabindex="0"><rect x="867" y="176" width="190" height="68" rx="14" /><text class="node-title" x="962" y="205">What-if S=256</text><text class="node-subtitle" x="962" y="227">whatif</text></g><g class="node attention" data-group-id="subgroup:AttentionCore:softmax" tabindex="0"><rect x="125" y="326" width="190" height="68" rx="14" /><text class="node-title" x="220" y="355">AttentionCore:softmax</text><text class="node-subtitle" x="220" y="377">attention</text></g><g class="node chain" data-group-id="subgroup:LinearChain:ln2..fc2" tabindex="0"><rect x="425" y="326" width="190" height="68" rx="14" /><text class="node-title" x="520" y="355">LinearChain:ln2..fc2</text><text class="node-subtitle" x="520" y="377">chain</text></g><g class="node pattern" data-group-id="subgroup:LinearBias" tabindex="0"><rect x="125" y="441" width="190" height="68" rx="14" /><text class="node-title" x="220" y="470">LinearBias</text><text class="node-subtitle" x="220" y="492">pattern</text></g><g class="node pattern" data-group-id="subgroup:NormThenLinear" tabindex="0"><rect x="425" y="441" width="190" height="68" rx="14" /><text class="node-title" x="520" y="470">NormThenLinear</text><text class="node-subtitle" x="520" y="492">pattern</text></g><g class="node residual" data-group-id="subgroup:ResidualJoin:residual_2" tabindex="0"><rect x="725" y="441" width="190" height="68" rx="14" /><text class="node-title" x="820" y="470">ResidualJoin:residual_2</text><text class="node-subtitle" x="820" y="492">residual</text></g></svg>
+    <div class="chips"><button class="chip" data-group-id="model:summary">Model Summary</button><button class="chip" data-group-id="topology:overview">Topology</button><button class="chip" data-group-id="shape:params">Shape Params</button><button class="chip" data-group-id="impact:params">Param Impact</button><button class="chip" data-group-id="cost:nodes">Node Costs</button><button class="chip" data-group-id="whatif:S=256">What-if S=256</button><button class="chip" data-group-id="subgroup:AttentionCore:softmax">AttentionCore:softmax</button><button class="chip" data-group-id="subgroup:LinearChain:ln2..fc2">LinearChain:ln2..fc2</button><button class="chip" data-group-id="subgroup:LinearBias">LinearBias</button><button class="chip" data-group-id="subgroup:LinearBias">LinearBias</button><button class="chip" data-group-id="subgroup:NormThenLinear">NormThenLinear</button><button class="chip" data-group-id="subgroup:ResidualJoin:residual_2">ResidualJoin:residual_2</button></div>
+  </article>
+  <aside id="detail-view" class="detail-card"><section class="detail-card"><h3>Model Summary</h3><p>15 nodes, 22 tensors, 17,186,816 known FLOPs proxy.</p><div class="metrics"><span class="metric"><b>Nodes</b><em>15</em></span><span class="metric"><b>Tensors</b><em>22</em></span><span class="metric"><b>Known FLOPs</b><em>17,186,816</em></span><span class="metric"><b>Known bytes</b><em>1,835,008</em></span></div><ul><li>What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.</li><li>Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.</li><li>Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.</li><li>Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.</li><li>Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.</li><li>1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose.</li></ul></section></aside>
+</section>
+<details class="raw-json card">
+  <summary>Raw JSON data</summary>
+  <pre>{
   &quot;graph&quot;: {
     &quot;name&quot;: &quot;tiny_transformer_block&quot;,
     &quot;node_count&quot;: 15,
@@ -1363,7 +1307,53 @@ pre { white-space:pre-wrap; word-break:break-word; margin:0; }
       ]
     }
   ]
-}</pre></aside>
+}</pre>
+</details>
+<script id="lens-data" type="application/json">{"report": {"graph": {"name": "tiny_transformer_block", "node_count": 15, "tensor_count": 22, "input_count": 1, "output_count": 1, "known_flops": 17186816, "known_bytes": 1835008}, "topology": {"topological_order": ["ln1", "q_proj", "k_proj", "v_proj", "k_transpose", "qk_scores", "softmax", "attn_ctx", "out_proj", "residual_1", "ln2", "fc1", "gelu", "fc2", "residual_2"], "depth_by_node": {"ln1": 0, "q_proj": 1, "k_proj": 1, "v_proj": 1, "k_transpose": 2, "qk_scores": 3, "softmax": 4, "attn_ctx": 5, "out_proj": 6, "residual_1": 7, "ln2": 8, "fc1": 9, "gelu": 10, "fc2": 11, "residual_2": 12}, "critical_path": ["ln1", "k_proj", "k_transpose", "qk_scores", "softmax", "attn_ctx", "out_proj", "residual_1", "ln2", "fc1", "gelu", "fc2", "residual_2"], "fanout_nodes": [["ln1", 3], ["residual_1", 2]], "fanin_nodes": [["qk_scores", 2], ["attn_ctx", 2], ["residual_2", 2]], "source_nodes": ["ln1"], "sink_nodes": ["residual_2"], "edges": [["ln1", "q_proj", "ln1_out"], ["ln1", "k_proj", "ln1_out"], ["ln1", "v_proj", "ln1_out"], ["q_proj", "qk_scores", "q"], ["k_proj", "k_transpose", "k"], ["v_proj", "attn_ctx", "v"], ["k_transpose", "qk_scores", "kt"], ["qk_scores", "softmax", "scores"], ["softmax", "attn_ctx", "prob"], ["attn_ctx", "out_proj", "ctx"], ["out_proj", "residual_1", "proj"], ["residual_1", "ln2", "res1"], ["residual_1", "residual_2", "res1"], ["ln2", "fc1", "ln2_out"], ["fc1", "gelu", "fc1"], ["gelu", "fc2", "gelu"], ["fc2", "residual_2", "fc2"]]}, "shape_params": [{"key": "B=1", "label": "B", "dim_value": 1, "tensor_axes": [["x", 0], ["ln1_out", 0], ["q", 0], ["k", 0], ["v", 0], ["kt", 0], ["scores", 0], ["prob", 0], ["ctx", 0], ["proj", 0], ["res1", 0], ["ln2_out", 0], ["fc1", 0], ["gelu", 0], ["fc2", 0], ["out", 0]], "producer_nodes": ["attn_ctx", "fc1", "fc2", "gelu", "k_proj", "k_transpose", "ln1", "ln2", "out_proj", "q_proj", "qk_scores", "residual_1", "residual_2", "softmax", "v_proj"], "consumer_nodes": ["attn_ctx", "fc1", "fc2", "gelu", "k_proj", "k_transpose", "ln1", "ln2", "out_proj", "q_proj", "qk_scores", "residual_1", "residual_2", "softmax", "v_proj"], "node_count": 15}, {"key": "S=128", "label": "S", "dim_value": 128, "tensor_axes": [["x", 1], ["ln1_out", 1], ["q", 1], ["k", 1], ["v", 1], ["scores", 1], ["prob", 1], ["ctx", 1], ["proj", 1], ["res1", 1], ["ln2_out", 1], ["fc1", 1], ["gelu", 1], ["fc2", 1], ["out", 1]], "producer_nodes": ["attn_ctx", "fc1", "fc2", "gelu", "k_proj", "ln1", "ln2", "out_proj", "q_proj", "qk_scores", "residual_1", "residual_2", "softmax", "v_proj"], "consumer_nodes": ["attn_ctx", "fc1", "fc2", "gelu", "k_proj", "k_transpose", "ln1", "ln2", "out_proj", "q_proj", "qk_scores", "residual_1", "residual_2", "softmax", "v_proj"], "node_count": 15}, {"key": "C=64", "label": "C", "dim_value": 64, "tensor_axes": [["x", 2], ["ln1_out", 2], ["q", 2], ["k", 2], ["v", 2], ["ctx", 2], ["proj", 2], ["res1", 2], ["ln2_out", 2], ["fc2", 2], ["out", 2]], "producer_nodes": ["attn_ctx", "fc2", "k_proj", "ln1", "ln2", "out_proj", "q_proj", "residual_1", "residual_2", "v_proj"], "consumer_nodes": ["attn_ctx", "fc1", "k_proj", "k_transpose", "ln1", "ln2", "out_proj", "q_proj", "qk_scores", "residual_1", "residual_2", "v_proj"], "node_count": 13}, {"key": "M=64", "label": "M", "dim_value": 64, "tensor_axes": [["wq", 0], ["wk", 0], ["wv", 0], ["wo", 0], ["w1", 0]], "producer_nodes": [], "consumer_nodes": ["fc1", "k_proj", "out_proj", "q_proj", "v_proj"], "node_count": 5}, {"key": "N=64", "label": "N", "dim_value": 64, "tensor_axes": [["wq", 1], ["wk", 1], ["wv", 1], ["wo", 1], ["w2", 1]], "producer_nodes": [], "consumer_nodes": ["fc2", "k_proj", "out_proj", "q_proj", "v_proj"], "node_count": 5}, {"key": "C=128", "label": "C", "dim_value": 128, "tensor_axes": [["kt", 2], ["scores", 2], ["prob", 2]], "producer_nodes": ["k_transpose", "qk_scores", "softmax"], "consumer_nodes": ["attn_ctx", "qk_scores", "softmax"], "node_count": 4}, {"key": "C=256", "label": "C", "dim_value": 256, "tensor_axes": [["fc1", 2], ["gelu", 2]], "producer_nodes": ["fc1", "gelu"], "consumer_nodes": ["fc2", "gelu"], "node_count": 3}, {"key": "S=64", "label": "S", "dim_value": 64, "tensor_axes": [["kt", 1]], "producer_nodes": ["k_transpose"], "consumer_nodes": ["qk_scores"], "node_count": 2}, {"key": "M=256", "label": "M", "dim_value": 256, "tensor_axes": [["w2", 0]], "producer_nodes": [], "consumer_nodes": ["fc2"], "node_count": 1}, {"key": "N=256", "label": "N", "dim_value": 256, "tensor_axes": [["w1", 1]], "producer_nodes": [], "consumer_nodes": ["fc1"], "node_count": 1}], "node_costs": [{"node": "ln1", "op_type": "LayerNormalization", "flops": 40960, "bytes_moved": 65536, "formula": "~5 * elements", "affected_params": ["B=1", "C=64", "S=128"]}, {"node": "q_proj", "op_type": "MatMul", "flops": 1048576, "bytes_moved": 81920, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=64", "M=64", "N=64", "S=128"]}, {"node": "k_proj", "op_type": "MatMul", "flops": 1048576, "bytes_moved": 81920, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=64", "M=64", "N=64", "S=128"]}, {"node": "v_proj", "op_type": "MatMul", "flops": 1048576, "bytes_moved": 81920, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=64", "M=64", "N=64", "S=128"]}, {"node": "k_transpose", "op_type": "Transpose", "flops": null, "bytes_moved": 65536, "formula": "shape-only / metadata op", "affected_params": ["B=1", "C=128", "C=64", "S=128", "S=64"]}, {"node": "qk_scores", "op_type": "MatMul", "flops": 2097152, "bytes_moved": 131072, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=128", "C=64", "S=128", "S=64"]}, {"node": "softmax", "op_type": "Softmax", "flops": 49152, "bytes_moved": 131072, "formula": "~3 * elements along softmax axis", "affected_params": ["B=1", "C=128", "S=128"]}, {"node": "attn_ctx", "op_type": "MatMul", "flops": 2097152, "bytes_moved": 131072, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=128", "C=64", "S=128"]}, {"node": "out_proj", "op_type": "MatMul", "flops": 1048576, "bytes_moved": 81920, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=64", "M=64", "N=64", "S=128"]}, {"node": "residual_1", "op_type": "Add", "flops": 8192, "bytes_moved": 98304, "formula": "1 * output_elements", "affected_params": ["B=1", "C=64", "S=128"]}, {"node": "ln2", "op_type": "LayerNormalization", "flops": 40960, "bytes_moved": 65536, "formula": "~5 * elements", "affected_params": ["B=1", "C=64", "S=128"]}, {"node": "fc1", "op_type": "MatMul", "flops": 4194304, "bytes_moved": 229376, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=256", "C=64", "M=64", "N=256", "S=128"]}, {"node": "gelu", "op_type": "Gelu", "flops": 262144, "bytes_moved": 262144, "formula": "~8 * output_elements activation approximation", "affected_params": ["B=1", "C=256", "S=128"]}, {"node": "fc2", "op_type": "MatMul", "flops": 4194304, "bytes_moved": 229376, "formula": "2 * batch * M * K * N", "affected_params": ["B=1", "C=256", "C=64", "M=256", "N=64", "S=128"]}, {"node": "residual_2", "op_type": "Add", "flops": 8192, "bytes_moved": 98304, "formula": "1 * output_elements", "affected_params": ["B=1", "C=64", "S=128"]}], "param_impacts": [{"param": "B=1", "affected_nodes": ["ln1", "q_proj", "k_proj", "v_proj", "k_transpose", "qk_scores", "softmax", "attn_ctx", "out_proj", "residual_1", "ln2", "fc1", "gelu", "fc2", "residual_2"], "known_flops": 17186816, "known_bytes": 1835008, "explanation": "B=1 appears in 16 tensor axes and touches 15 graph nodes."}, {"param": "S=128", "affected_nodes": ["ln1", "q_proj", "k_proj", "v_proj", "k_transpose", "qk_scores", "softmax", "attn_ctx", "out_proj", "residual_1", "ln2", "fc1", "gelu", "fc2", "residual_2"], "known_flops": 17186816, "known_bytes": 1835008, "explanation": "S=128 appears in 15 tensor axes and touches 15 graph nodes."}, {"param": "C=64", "affected_nodes": ["ln1", "q_proj", "k_proj", "v_proj", "k_transpose", "qk_scores", "attn_ctx", "out_proj", "residual_1", "ln2", "fc1", "fc2", "residual_2"], "known_flops": 16875520, "known_bytes": 1441792, "explanation": "C=64 appears in 11 tensor axes and touches 13 graph nodes."}, {"param": "C=256", "affected_nodes": ["fc1", "gelu", "fc2"], "known_flops": 8650752, "known_bytes": 720896, "explanation": "C=256 appears in 2 tensor axes and touches 3 graph nodes."}, {"param": "M=64", "affected_nodes": ["q_proj", "k_proj", "v_proj", "out_proj", "fc1"], "known_flops": 8388608, "known_bytes": 557056, "explanation": "M=64 appears in 5 tensor axes and touches 5 graph nodes."}, {"param": "N=64", "affected_nodes": ["q_proj", "k_proj", "v_proj", "out_proj", "fc2"], "known_flops": 8388608, "known_bytes": 557056, "explanation": "N=64 appears in 5 tensor axes and touches 5 graph nodes."}, {"param": "C=128", "affected_nodes": ["k_transpose", "qk_scores", "softmax", "attn_ctx"], "known_flops": 4243456, "known_bytes": 458752, "explanation": "C=128 appears in 3 tensor axes and touches 4 graph nodes."}, {"param": "M=256", "affected_nodes": ["fc2"], "known_flops": 4194304, "known_bytes": 229376, "explanation": "M=256 appears in 1 tensor axes and touches 1 graph nodes."}, {"param": "N=256", "affected_nodes": ["fc1"], "known_flops": 4194304, "known_bytes": 229376, "explanation": "N=256 appears in 1 tensor axes and touches 1 graph nodes."}, {"param": "S=64", "affected_nodes": ["k_transpose", "qk_scores"], "known_flops": 2097152, "known_bytes": 196608, "explanation": "S=64 appears in 1 tensor axes and touches 2 graph nodes."}], "subgroups": [{"name": "AttentionCore:softmax", "kind": "attention", "nodes": ["attn_ctx", "qk_scores", "softmax"], "reason": "MatMul/Gemm -> Softmax -> MatMul/Gemm motif"}, {"name": "LinearChain:ln2..fc2", "kind": "chain", "nodes": ["ln2", "fc1", "gelu", "fc2"], "reason": "Long single-producer/single-consumer chain"}, {"name": "LinearBias", "kind": "pattern", "nodes": ["out_proj", "residual_1"], "reason": "Matched op pattern LinearBias"}, {"name": "LinearBias", "kind": "pattern", "nodes": ["fc2", "residual_2"], "reason": "Matched op pattern LinearBias"}, {"name": "NormThenLinear", "kind": "pattern", "nodes": ["ln2", "fc1"], "reason": "Matched op pattern NormThenLinear"}, {"name": "ResidualJoin:residual_2", "kind": "residual", "nodes": ["fc2", "residual_1", "residual_2"], "reason": "Add/Sum node merges multiple producer branches"}], "recommendations": ["What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.", "Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.", "Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.", "Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.", "Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.", "1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose."], "what_if": [{"overrides": {"S": 256}, "known_flops_before": 17186816, "known_flops_after": 34373632, "known_flops_delta": 17186816, "known_flops_ratio": 2.0, "known_bytes_before": 1835008, "known_bytes_after": 3604480, "known_bytes_delta": 1769472, "changed_node_count": 15, "top_changed_nodes": [{"node": "fc1", "op_type": "MatMul", "flops_before": 4194304, "flops_after": 8388608, "flops_delta": 4194304, "flops_ratio": 2.0, "bytes_before": 229376, "bytes_after": 393216, "bytes_delta": 163840}, {"node": "fc2", "op_type": "MatMul", "flops_before": 4194304, "flops_after": 8388608, "flops_delta": 4194304, "flops_ratio": 2.0, "bytes_before": 229376, "bytes_after": 393216, "bytes_delta": 163840}, {"node": "qk_scores", "op_type": "MatMul", "flops_before": 2097152, "flops_after": 4194304, "flops_delta": 2097152, "flops_ratio": 2.0, "bytes_before": 131072, "bytes_after": 327680, "bytes_delta": 196608}, {"node": "attn_ctx", "op_type": "MatMul", "flops_before": 2097152, "flops_after": 4194304, "flops_delta": 2097152, "flops_ratio": 2.0, "bytes_before": 131072, "bytes_after": 262144, "bytes_delta": 131072}, {"node": "q_proj", "op_type": "MatMul", "flops_before": 1048576, "flops_after": 2097152, "flops_delta": 1048576, "flops_ratio": 2.0, "bytes_before": 81920, "bytes_after": 147456, "bytes_delta": 65536}, {"node": "k_proj", "op_type": "MatMul", "flops_before": 1048576, "flops_after": 2097152, "flops_delta": 1048576, "flops_ratio": 2.0, "bytes_before": 81920, "bytes_after": 147456, "bytes_delta": 65536}, {"node": "v_proj", "op_type": "MatMul", "flops_before": 1048576, "flops_after": 2097152, "flops_delta": 1048576, "flops_ratio": 2.0, "bytes_before": 81920, "bytes_after": 147456, "bytes_delta": 65536}, {"node": "out_proj", "op_type": "MatMul", "flops_before": 1048576, "flops_after": 2097152, "flops_delta": 1048576, "flops_ratio": 2.0, "bytes_before": 81920, "bytes_after": 147456, "bytes_delta": 65536}, {"node": "gelu", "op_type": "Gelu", "flops_before": 262144, "flops_after": 524288, "flops_delta": 262144, "flops_ratio": 2.0, "bytes_before": 262144, "bytes_after": 524288, "bytes_delta": 262144}, {"node": "softmax", "op_type": "Softmax", "flops_before": 49152, "flops_after": 98304, "flops_delta": 49152, "flops_ratio": 2.0, "bytes_before": 131072, "bytes_after": 262144, "bytes_delta": 131072}, {"node": "ln1", "op_type": "LayerNormalization", "flops_before": 40960, "flops_after": 81920, "flops_delta": 40960, "flops_ratio": 2.0, "bytes_before": 65536, "bytes_after": 131072, "bytes_delta": 65536}, {"node": "ln2", "op_type": "LayerNormalization", "flops_before": 40960, "flops_after": 81920, "flops_delta": 40960, "flops_ratio": 2.0, "bytes_before": 65536, "bytes_after": 131072, "bytes_delta": 65536}, {"node": "residual_1", "op_type": "Add", "flops_before": 8192, "flops_after": 16384, "flops_delta": 8192, "flops_ratio": 2.0, "bytes_before": 98304, "bytes_after": 196608, "bytes_delta": 98304}, {"node": "residual_2", "op_type": "Add", "flops_before": 8192, "flops_after": 16384, "flops_delta": 8192, "flops_ratio": 2.0, "bytes_before": 98304, "bytes_after": 196608, "bytes_delta": 98304}, {"node": "k_transpose", "op_type": "Transpose", "flops_before": null, "flops_after": null, "flops_delta": null, "flops_ratio": null, "bytes_before": 65536, "bytes_after": 196608, "bytes_delta": 131072}]}]}, "groups": [{"id": "model:summary", "title": "Model Summary", "kind": "model", "summary": "15 nodes, 22 tensors, 17,186,816 known FLOPs proxy.", "metrics": {"Nodes": 15, "Tensors": 22, "Known FLOPs": 17186816, "Known bytes": 1835008}, "items": ["What-if `S=256` changes known FLOPs by 17,186,816 (2.00x) across 15 nodes.", "Inspect fanout node `ln1` first: it branches into 3 consumers and may define a major structural split.", "Inspect fanin node `qk_scores` first: it merges 2 producers and may correspond to residual/concat behavior.", "Most impactful visible shape parameter is `B=1` with 15 affected nodes and 17,186,816 known FLOPs.", "Detected 6 collapsible subgroups (attention, chain, pattern, residual); use these as a first graph simplification layer.", "1 nodes have unknown FLOPs formulas; add op-specific formulas for: k_transpose."]}, {"id": "topology:overview", "title": "Topology", "kind": "topology", "summary": "Critical path length 13; 2 fanout and 3 fanin hotspots.", "metrics": {"Critical path": 13, "Sources": 1, "Sinks": 1}, "items": ["Critical path: ln1 → k_proj → k_transpose → qk_scores → softmax → attn_ctx → out_proj → residual_1 → ln2 → fc1 → gelu → fc2 → residual_2", "Sources: ln1", "Sinks: residual_2"], "table": {"headers": ["Type", "Node", "Degree"], "rows": [["fanout", "ln1", 3], ["fanout", "residual_1", 2], ["fanin", "qk_scores", 2], ["fanin", "attn_ctx", 2], ["fanin", "residual_2", 2]]}}, {"id": "shape:params", "title": "Shape Params", "kind": "shape", "summary": "Canonical axis roles and the graph nodes they touch.", "metrics": {"Params": 10, "Top axes shown": 10}, "table": {"headers": ["Param", "Dim", "Tensor axes", "Nodes touched"], "rows": [["B=1", 1, 16, 15], ["S=128", 128, 15, 15], ["C=64", 64, 11, 13], ["M=64", 64, 5, 5], ["N=64", 64, 5, 5], ["C=128", 128, 3, 4], ["C=256", 256, 2, 3], ["S=64", 64, 1, 2], ["M=256", 256, 1, 1], ["N=256", 256, 1, 1]]}}, {"id": "impact:params", "title": "Param Impact", "kind": "impact", "summary": "First-order FLOPs/bytes proxy grouped by shape parameter.", "metrics": {"Known FLOPs": 17186816, "Known bytes": 1835008}, "table": {"headers": ["Param", "Affected nodes", "Known FLOPs", "Known bytes"], "rows": [["B=1", 15, 17186816, 1835008], ["S=128", 15, 17186816, 1835008], ["C=64", 13, 16875520, 1441792], ["C=256", 3, 8650752, 720896], ["M=64", 5, 8388608, 557056], ["N=64", 5, 8388608, 557056], ["C=128", 4, 4243456, 458752], ["M=256", 1, 4194304, 229376], ["N=256", 1, 4194304, 229376], ["S=64", 2, 2097152, 196608]]}}, {"id": "cost:nodes", "title": "Node Costs", "kind": "cost", "summary": "Largest per-node rough operation costs.", "metrics": {"Costed nodes": 14}, "table": {"headers": ["Node", "Op", "FLOPs", "Bytes", "Formula"], "rows": [["fc1", "MatMul", 4194304, 229376, "2 * batch * M * K * N"], ["fc2", "MatMul", 4194304, 229376, "2 * batch * M * K * N"], ["qk_scores", "MatMul", 2097152, 131072, "2 * batch * M * K * N"], ["attn_ctx", "MatMul", 2097152, 131072, "2 * batch * M * K * N"], ["q_proj", "MatMul", 1048576, 81920, "2 * batch * M * K * N"], ["k_proj", "MatMul", 1048576, 81920, "2 * batch * M * K * N"], ["v_proj", "MatMul", 1048576, 81920, "2 * batch * M * K * N"], ["out_proj", "MatMul", 1048576, 81920, "2 * batch * M * K * N"], ["gelu", "Gelu", 262144, 262144, "~8 * output_elements activation approximation"], ["softmax", "Softmax", 49152, 131072, "~3 * elements along softmax axis"], ["ln1", "LayerNormalization", 40960, 65536, "~5 * elements"], ["ln2", "LayerNormalization", 40960, 65536, "~5 * elements"], ["residual_1", "Add", 8192, 98304, "1 * output_elements"], ["residual_2", "Add", 8192, 98304, "1 * output_elements"], ["k_transpose", "Transpose", null, 65536, "shape-only / metadata op"]]}}, {"id": "whatif:S=256", "title": "What-if S=256", "kind": "whatif", "summary": "Known FLOPs changes 17,186,816 → 34,373,632 (2.00x).", "metrics": {"Δ FLOPs": 17186816, "Δ bytes": 1769472, "Changed nodes": 15}, "table": {"headers": ["Node", "Op", "Before", "After", "Δ", "Ratio"], "rows": [["fc1", "MatMul", 4194304, 8388608, 4194304, 2.0], ["fc2", "MatMul", 4194304, 8388608, 4194304, 2.0], ["qk_scores", "MatMul", 2097152, 4194304, 2097152, 2.0], ["attn_ctx", "MatMul", 2097152, 4194304, 2097152, 2.0], ["q_proj", "MatMul", 1048576, 2097152, 1048576, 2.0], ["k_proj", "MatMul", 1048576, 2097152, 1048576, 2.0], ["v_proj", "MatMul", 1048576, 2097152, 1048576, 2.0], ["out_proj", "MatMul", 1048576, 2097152, 1048576, 2.0], ["gelu", "Gelu", 262144, 524288, 262144, 2.0], ["softmax", "Softmax", 49152, 98304, 49152, 2.0], ["ln1", "LayerNormalization", 40960, 81920, 40960, 2.0], ["ln2", "LayerNormalization", 40960, 81920, 40960, 2.0], ["residual_1", "Add", 8192, 16384, 8192, 2.0], ["residual_2", "Add", 8192, 16384, 8192, 2.0], ["k_transpose", "Transpose", null, null, null, null]]}}, {"id": "subgroup:AttentionCore:softmax", "title": "AttentionCore:softmax", "kind": "attention", "summary": "MatMul/Gemm -> Softmax -> MatMul/Gemm motif", "metrics": {"Nodes": 3, "Known FLOPs": 4243456}, "items": ["Nodes: attn_ctx, qk_scores, softmax"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["qk_scores", "MatMul", 2097152, 131072], ["softmax", "Softmax", 49152, 131072], ["attn_ctx", "MatMul", 2097152, 131072]]}}, {"id": "subgroup:LinearChain:ln2..fc2", "title": "LinearChain:ln2..fc2", "kind": "chain", "summary": "Long single-producer/single-consumer chain", "metrics": {"Nodes": 4, "Known FLOPs": 8691712}, "items": ["Nodes: ln2, fc1, gelu, fc2"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["ln2", "LayerNormalization", 40960, 65536], ["fc1", "MatMul", 4194304, 229376], ["gelu", "Gelu", 262144, 262144], ["fc2", "MatMul", 4194304, 229376]]}}, {"id": "subgroup:LinearBias", "title": "LinearBias", "kind": "pattern", "summary": "Matched op pattern LinearBias", "metrics": {"Nodes": 2, "Known FLOPs": 1056768}, "items": ["Nodes: out_proj, residual_1"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["out_proj", "MatMul", 1048576, 81920], ["residual_1", "Add", 8192, 98304]]}}, {"id": "subgroup:LinearBias", "title": "LinearBias", "kind": "pattern", "summary": "Matched op pattern LinearBias", "metrics": {"Nodes": 2, "Known FLOPs": 4202496}, "items": ["Nodes: fc2, residual_2"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["fc2", "MatMul", 4194304, 229376], ["residual_2", "Add", 8192, 98304]]}}, {"id": "subgroup:NormThenLinear", "title": "NormThenLinear", "kind": "pattern", "summary": "Matched op pattern NormThenLinear", "metrics": {"Nodes": 2, "Known FLOPs": 4235264}, "items": ["Nodes: ln2, fc1"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["ln2", "LayerNormalization", 40960, 65536], ["fc1", "MatMul", 4194304, 229376]]}}, {"id": "subgroup:ResidualJoin:residual_2", "title": "ResidualJoin:residual_2", "kind": "residual", "summary": "Add/Sum node merges multiple producer branches", "metrics": {"Nodes": 3, "Known FLOPs": 4210688}, "items": ["Nodes: fc2, residual_1, residual_2"], "table": {"headers": ["Node", "Op", "FLOPs", "Bytes"], "rows": [["residual_1", "Add", 8192, 98304], ["fc2", "MatMul", 4194304, 229376], ["residual_2", "Add", 8192, 98304]]}}]}</script>
+<script>
+const lensPayload = JSON.parse(document.getElementById('lens-data').textContent);
+const groups = new Map(lensPayload.groups.map(g => [g.id, g]));
+function fmt(value) {
+  if (value === null || value === undefined) return '?';
+  if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+  return String(value);
+}
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function renderTable(table) {
+  if (!table) return '';
+  const head = table.headers.map(h => `<th>${esc(h)}</th>`).join('');
+  const rows = table.rows.map(row => `<tr>${row.map(cell => `<td>${esc(fmt(cell))}</td>`).join('')}</tr>`).join('');
+  return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderMetrics(metrics) {
+  return Object.entries(metrics || {}).map(([k,v]) => `<span class="metric"><b>${esc(k)}</b><em>${esc(fmt(v))}</em></span>`).join('');
+}
+function selectGroup(id) {
+  const g = groups.get(id);
+  if (!g) return;
+  document.querySelectorAll('[data-group-id]').forEach(el => el.classList.toggle('active', el.getAttribute('data-group-id') === id));
+  const items = (g.items || []).map(item => `<li>${esc(item)}</li>`).join('');
+  document.getElementById('detail-view').innerHTML = `
+    <h3>${esc(g.title)}</h3>
+    <p>${esc(g.summary)}</p>
+    <div class="metrics">${renderMetrics(g.metrics)}</div>
+    ${items ? `<ul>${items}</ul>` : ''}
+    ${renderTable(g.table)}
+  `;
+}
+document.querySelectorAll('[data-group-id]').forEach(el => {
+  el.addEventListener('click', () => selectGroup(el.getAttribute('data-group-id')));
+  el.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectGroup(el.getAttribute('data-group-id'));
+    }
+  });
+});
+selectGroup('model:summary');
+</script>
 </main>
 </body>
 </html>

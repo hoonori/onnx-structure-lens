@@ -90,38 +90,310 @@ def write_markdown(report: dict[str, Any], path: str | Path) -> None:
     Path(path).write_text(render_markdown(report))
 
 
+def _fmt(value: Any) -> str:
+    if value is None:
+        return "?"
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
+
+
+def _h(value: Any) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _table(headers: list[str], rows: list[list[Any]]) -> str:
+    head = "".join(f"<th>{_h(x)}</th>" for x in headers)
+    body = "".join("<tr>" + "".join(f"<td>{_h(_fmt(x))}</td>" for x in row) + "</tr>" for row in rows)
+    return f"<div class=\"table-wrap\"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>"
+
+
+def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
+    g = report["graph"]
+    topo = report["topology"]
+    groups: list[dict[str, Any]] = [
+        {
+            "id": "model:summary",
+            "title": "Model Summary",
+            "kind": "model",
+            "summary": f"{g['node_count']} nodes, {g['tensor_count']} tensors, {_fmt(g['known_flops'])} known FLOPs proxy.",
+            "metrics": {
+                "Nodes": g["node_count"],
+                "Tensors": g["tensor_count"],
+                "Known FLOPs": g["known_flops"],
+                "Known bytes": g["known_bytes"],
+            },
+            "items": report["recommendations"],
+        },
+        {
+            "id": "topology:overview",
+            "title": "Topology",
+            "kind": "topology",
+            "summary": f"Critical path length {len(topo['critical_path'])}; {len(topo['fanout_nodes'])} fanout and {len(topo['fanin_nodes'])} fanin hotspots.",
+            "metrics": {"Critical path": len(topo["critical_path"]), "Sources": len(topo["source_nodes"]), "Sinks": len(topo["sink_nodes"])},
+            "items": [
+                "Critical path: " + " → ".join(topo["critical_path"][:40]),
+                "Sources: " + (", ".join(topo["source_nodes"][:12]) or "-"),
+                "Sinks: " + (", ".join(topo["sink_nodes"][:12]) or "-"),
+            ],
+            "table": {
+                "headers": ["Type", "Node", "Degree"],
+                "rows": [["fanout", n, d] for n, d in topo["fanout_nodes"][:10]] + [["fanin", n, d] for n, d in topo["fanin_nodes"][:10]],
+            },
+        },
+        {
+            "id": "shape:params",
+            "title": "Shape Params",
+            "kind": "shape",
+            "summary": "Canonical axis roles and the graph nodes they touch.",
+            "metrics": {"Params": len(report["shape_params"]), "Top axes shown": min(12, len(report["shape_params"]))},
+            "table": {
+                "headers": ["Param", "Dim", "Tensor axes", "Nodes touched"],
+                "rows": [[p["key"], p["dim_value"], len(p["tensor_axes"]), p["node_count"]] for p in report["shape_params"][:20]],
+            },
+        },
+        {
+            "id": "impact:params",
+            "title": "Param Impact",
+            "kind": "impact",
+            "summary": "First-order FLOPs/bytes proxy grouped by shape parameter.",
+            "metrics": {"Known FLOPs": g["known_flops"], "Known bytes": g["known_bytes"]},
+            "table": {
+                "headers": ["Param", "Affected nodes", "Known FLOPs", "Known bytes"],
+                "rows": [[p["param"], len(p["affected_nodes"]), p["known_flops"], p["known_bytes"]] for p in report["param_impacts"][:20]],
+            },
+        },
+        {
+            "id": "cost:nodes",
+            "title": "Node Costs",
+            "kind": "cost",
+            "summary": "Largest per-node rough operation costs.",
+            "metrics": {"Costed nodes": len([c for c in report["node_costs"] if c["flops"] is not None])},
+            "table": {
+                "headers": ["Node", "Op", "FLOPs", "Bytes", "Formula"],
+                "rows": [[c["node"], c["op_type"], c["flops"], c["bytes_moved"], c["formula"]] for c in sorted(report["node_costs"], key=lambda c: c["flops"] or 0, reverse=True)[:20]],
+            },
+        },
+    ]
+    if report.get("what_if"):
+        for w in report["what_if"]:
+            label = ", ".join(f"{k}={v}" for k, v in w["overrides"].items())
+            groups.append(
+                {
+                    "id": f"whatif:{label}",
+                    "title": f"What-if {label}",
+                    "kind": "whatif",
+                    "summary": f"Known FLOPs changes {_fmt(w['known_flops_before'])} → {_fmt(w['known_flops_after'])} ({_fmt(w['known_flops_ratio'])}x).",
+                    "metrics": {"Δ FLOPs": w["known_flops_delta"], "Δ bytes": w["known_bytes_delta"], "Changed nodes": w["changed_node_count"]},
+                    "table": {
+                        "headers": ["Node", "Op", "Before", "After", "Δ", "Ratio"],
+                        "rows": [[n["node"], n["op_type"], n["flops_before"], n["flops_after"], n["flops_delta"], n["flops_ratio"]] for n in w["top_changed_nodes"][:20]],
+                    },
+                }
+            )
+    for s in report["subgroups"]:
+        related_costs = [c for c in report["node_costs"] if c["node"] in set(s["nodes"])]
+        groups.append(
+            {
+                "id": f"subgroup:{s['name']}",
+                "title": s["name"],
+                "kind": s["kind"],
+                "summary": s["reason"],
+                "metrics": {"Nodes": len(s["nodes"]), "Known FLOPs": sum(c["flops"] or 0 for c in related_costs)},
+                "items": ["Nodes: " + ", ".join(s["nodes"])],
+                "table": {
+                    "headers": ["Node", "Op", "FLOPs", "Bytes"],
+                    "rows": [[c["node"], c["op_type"], c["flops"], c["bytes_moved"]] for c in related_costs],
+                },
+            }
+        )
+    return groups
+
+
+def _render_static_detail(group: dict[str, Any]) -> str:
+    metrics = "".join(f"<span class=\"metric\"><b>{_h(k)}</b><em>{_h(_fmt(v))}</em></span>" for k, v in group.get("metrics", {}).items())
+    items = "".join(f"<li>{_h(item)}</li>" for item in group.get("items", []))
+    table = ""
+    if group.get("table"):
+        table = _table(group["table"]["headers"], group["table"]["rows"])
+    return f"<section class=\"detail-card\"><h3>{_h(group['title'])}</h3><p>{_h(group['summary'])}</p><div class=\"metrics\">{metrics}</div>{'<ul>'+items+'</ul>' if items else ''}{table}</section>"
+
+
+def _graph_positions(groups: list[dict[str, Any]]) -> dict[str, tuple[int, int]]:
+    positions: dict[str, tuple[int, int]] = {"model:summary": (520, 70)}
+    core_ids = ["topology:overview", "shape:params", "impact:params", "cost:nodes"] + [g["id"] for g in groups if g["kind"] == "whatif"]
+    core_ids = [gid for gid in core_ids if any(g["id"] == gid for g in groups)]
+    if core_ids:
+        step = 980 / max(1, len(core_ids))
+        for i, gid in enumerate(core_ids):
+            positions[gid] = (int(80 + step * i + step / 2), 210)
+    subgroup_ids = [g["id"] for g in groups if g["id"].startswith("subgroup:")]
+    cols = 3
+    for i, gid in enumerate(subgroup_ids):
+        positions[gid] = (220 + (i % cols) * 300, 360 + (i // cols) * 115)
+    return positions
+
+
+def _render_group_graph(groups: list[dict[str, Any]]) -> str:
+    positions = _graph_positions(groups)
+    by_id = {g["id"]: g for g in groups}
+    core_ids = [gid for gid, (_, y) in positions.items() if y == 210]
+    subgroup_ids = [gid for gid in positions if gid.startswith("subgroup:")]
+    edges: list[tuple[str, str]] = [("model:summary", gid) for gid in core_ids]
+    edges += [("impact:params", gid) for gid in subgroup_ids if "impact:params" in positions]
+    height = max((y for _, y in positions.values()), default=500) + 95
+    edge_svg = []
+    for src, dst in edges:
+        if src not in positions or dst not in positions:
+            continue
+        x1, y1 = positions[src]
+        x2, y2 = positions[dst]
+        edge_svg.append(f'<line class="edge" x1="{x1}" y1="{y1 + 34}" x2="{x2}" y2="{y2 - 34}" />')
+    node_svg = []
+    for gid, (x, y) in positions.items():
+        group = by_id[gid]
+        cls = f"node {group['kind']}"
+        title = _h(group["title"][:26])
+        subtitle = _h(group["kind"])
+        node_svg.append(
+            f'<g class="{cls}" data-group-id="{_h(gid)}" tabindex="0">'
+            f'<rect x="{x-95}" y="{y-34}" width="190" height="68" rx="14" />'
+            f'<text class="node-title" x="{x}" y="{y-5}">{title}</text>'
+            f'<text class="node-subtitle" x="{x}" y="{y+17}">{subtitle}</text>'
+            f'</g>'
+        )
+    return f'<svg id="overview-graph" viewBox="0 0 1120 {height}" role="img" aria-label="Group overview graph">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
+
+
 def render_html(report: dict[str, Any]) -> str:
-    md = render_markdown(report)
-    payload = html.escape(json.dumps(report, ensure_ascii=False, indent=2))
-    body = html.escape(md)
-    # Small dependency-free HTML: markdown remains preformatted for reliability.
+    groups = _build_group_data(report)
+    payload = json.dumps({"report": report, "groups": groups}, ensure_ascii=False).replace("</", "<\\/")
+    initial_detail = _render_static_detail(groups[0])
+    graph = report["graph"]
+    chips = "".join(
+        f'<button class="chip" data-group-id="{_h(g["id"])}">{_h(g["title"])}</button>'
+        for g in groups[:18]
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Structure Lens: {html.escape(report['graph']['name'])}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Structure Lens: {_h(graph['name'])}</title>
 <style>
-:root {{ color-scheme: dark; }}
-body {{ margin:0; background:#0b1020; color:#dbeafe; font:14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }}
-header {{ position:sticky; top:0; background:#111827ee; backdrop-filter: blur(8px); padding:18px 28px; border-bottom:1px solid #334155; }}
-h1 {{ margin:0; font-size:22px; }}
-main {{ display:grid; grid-template-columns: minmax(0, 1.3fr) minmax(380px, .7fr); gap:20px; padding:24px; }}
-.card {{ background:#111827; border:1px solid #334155; border-radius:16px; padding:18px; box-shadow: 0 8px 30px #0004; }}
-pre {{ white-space:pre-wrap; word-break:break-word; margin:0; }}
-.json {{ max-height:80vh; overflow:auto; color:#bfdbfe; }}
-.badge {{ display:inline-block; margin-right:12px; color:#93c5fd; }}
+:root {{ color-scheme: dark; --bg:#08111f; --panel:#101b2e; --panel2:#0d1627; --line:#334155; --text:#e5eefb; --muted:#93a4bb; --accent:#60a5fa; --good:#34d399; --warn:#fbbf24; --pink:#f472b6; --purple:#a78bfa; }}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; background:radial-gradient(circle at 20% 0%, #13284a 0, var(--bg) 42%); color:var(--text); font:14px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }}
+header {{ position:sticky; top:0; z-index:10; background:#08111fe8; backdrop-filter: blur(10px); padding:16px 22px; border-bottom:1px solid var(--line); }}
+h1 {{ margin:0 0 8px; font-size:22px; }}
+.badge {{ display:inline-flex; gap:6px; align-items:center; margin:0 8px 6px 0; padding:5px 10px; border:1px solid #315071; border-radius:999px; color:#bfdbfe; background:#0b1d33; }}
+main {{ padding:18px; max-width:1380px; margin:0 auto; }}
+.grid {{ display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(360px, .8fr); gap:18px; align-items:start; }}
+.card, .detail-card {{ background:linear-gradient(180deg, #111d31, #0d1728); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 14px 40px #0007; }}
+.card h2, .detail-card h3 {{ margin:0 0 10px; }}
+.graph-card {{ overflow:auto; }}
+#overview-graph {{ min-width:900px; width:100%; height:auto; display:block; }}
+.edge {{ stroke:#39536f; stroke-width:2; opacity:.9; }}
+.node {{ cursor:pointer; outline:none; }}
+.node rect {{ fill:#13223a; stroke:#3b5d7d; stroke-width:1.5; filter: drop-shadow(0 8px 12px #0008); transition:fill .15s, stroke .15s, transform .15s; }}
+.node:hover rect, .node.active rect {{ fill:#173456; stroke:#7dd3fc; }}
+.node.model rect {{ fill:#172554; stroke:#60a5fa; }}
+.node.topology rect {{ fill:#123524; stroke:#34d399; }}
+.node.shape rect {{ fill:#33245d; stroke:#a78bfa; }}
+.node.impact rect, .node.cost rect {{ fill:#442817; stroke:#fbbf24; }}
+.node.whatif rect {{ fill:#4a1635; stroke:#f472b6; }}
+.node.attention rect {{ fill:#3b1f54; stroke:#c084fc; }}
+.node.residual rect {{ fill:#482121; stroke:#fb7185; }}
+.node text {{ text-anchor:middle; pointer-events:none; }}
+.node-title {{ fill:#f8fafc; font-weight:700; font-size:13px; }}
+.node-subtitle {{ fill:#a9bdd4; font-size:11px; text-transform:uppercase; letter-spacing:.07em; }}
+.chips {{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }}
+.chip {{ border:1px solid #38516e; background:#0b1d33; color:#dbeafe; border-radius:999px; padding:7px 10px; cursor:pointer; }}
+.chip:hover {{ border-color:#7dd3fc; color:white; }}
+.metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:12px 0; }}
+.metric {{ display:block; padding:10px; border:1px solid #2e4661; background:#0b1829; border-radius:12px; }}
+.metric b {{ display:block; color:#9fb4cc; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }}
+.metric em {{ display:block; color:#f8fafc; font-style:normal; font-size:18px; font-weight:750; }}
+.table-wrap {{ overflow:auto; margin-top:12px; border:1px solid #2d435c; border-radius:12px; }}
+table {{ width:100%; border-collapse:collapse; min-width:520px; }}
+th, td {{ padding:8px 10px; border-bottom:1px solid #23374f; vertical-align:top; }}
+th {{ position:sticky; top:0; background:#13223a; color:#bfdbfe; text-align:left; }}
+td {{ color:#dbeafe; }}
+ul {{ padding-left:20px; color:#d5e3f3; }}
+.raw-json {{ margin-top:18px; }}
+.raw-json summary {{ cursor:pointer; color:#93c5fd; }}
+.raw-json pre {{ white-space:pre-wrap; max-height:360px; overflow:auto; background:#07101d; padding:14px; border-radius:12px; }}
+@media (max-width: 900px) {{ .grid {{ grid-template-columns:1fr; }} header {{ position:static; }} main {{ padding:12px; }} .card, .detail-card {{ border-radius:14px; }} }}
 </style>
 </head>
 <body>
 <header>
-<h1>Structure Lens: {html.escape(report['graph']['name'])}</h1>
-<span class="badge">nodes {report['graph']['node_count']}</span>
-<span class="badge">known FLOPs {report['graph']['known_flops']:,}</span>
-<span class="badge">subgroups {len(report['subgroups'])}</span>
+<h1>Structure Lens: {_h(graph['name'])}</h1>
+<span class="badge">nodes <b>{_h(_fmt(graph['node_count']))}</b></span>
+<span class="badge">known FLOPs <b>{_h(_fmt(graph['known_flops']))}</b></span>
+<span class="badge">subgroups <b>{_h(_fmt(len(report['subgroups'])))}</b></span>
 </header>
 <main>
-<section class="card"><pre>{body}</pre></section>
-<aside class="card json"><pre>{payload}</pre></aside>
+<section class="grid">
+  <article class="card graph-card">
+    <h2>Group overview graph</h2>
+    <p>Click a large category or detected subgroup. The detail view updates below/right with tables and node-level information.</p>
+    {_render_group_graph(groups)}
+    <div class="chips">{chips}</div>
+  </article>
+  <aside id="detail-view" class="detail-card">{initial_detail}</aside>
+</section>
+<details class="raw-json card">
+  <summary>Raw JSON data</summary>
+  <pre>{_h(json.dumps(report, indent=2, ensure_ascii=False))}</pre>
+</details>
+<script id="lens-data" type="application/json">{payload}</script>
+<script>
+const lensPayload = JSON.parse(document.getElementById('lens-data').textContent);
+const groups = new Map(lensPayload.groups.map(g => [g.id, g]));
+function fmt(value) {{
+  if (value === null || value === undefined) return '?';
+  if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+  return String(value);
+}}
+function esc(value) {{
+  return String(value).replace(/[&<>\"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}}[ch]));
+}}
+function renderTable(table) {{
+  if (!table) return '';
+  const head = table.headers.map(h => `<th>${{esc(h)}}</th>`).join('');
+  const rows = table.rows.map(row => `<tr>${{row.map(cell => `<td>${{esc(fmt(cell))}}</td>`).join('')}}</tr>`).join('');
+  return `<div class="table-wrap"><table><thead><tr>${{head}}</tr></thead><tbody>${{rows}}</tbody></table></div>`;
+}}
+function renderMetrics(metrics) {{
+  return Object.entries(metrics || {{}}).map(([k,v]) => `<span class="metric"><b>${{esc(k)}}</b><em>${{esc(fmt(v))}}</em></span>`).join('');
+}}
+function selectGroup(id) {{
+  const g = groups.get(id);
+  if (!g) return;
+  document.querySelectorAll('[data-group-id]').forEach(el => el.classList.toggle('active', el.getAttribute('data-group-id') === id));
+  const items = (g.items || []).map(item => `<li>${{esc(item)}}</li>`).join('');
+  document.getElementById('detail-view').innerHTML = `
+    <h3>${{esc(g.title)}}</h3>
+    <p>${{esc(g.summary)}}</p>
+    <div class="metrics">${{renderMetrics(g.metrics)}}</div>
+    ${{items ? `<ul>${{items}}</ul>` : ''}}
+    ${{renderTable(g.table)}}
+  `;
+}}
+document.querySelectorAll('[data-group-id]').forEach(el => {{
+  el.addEventListener('click', () => selectGroup(el.getAttribute('data-group-id')));
+  el.addEventListener('keydown', event => {{
+    if (event.key === 'Enter' || event.key === ' ') {{
+      event.preventDefault();
+      selectGroup(el.getAttribute('data-group-id'));
+    }}
+  }});
+}});
+selectGroup('model:summary');
+</script>
 </main>
 </body>
 </html>"""

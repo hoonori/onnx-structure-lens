@@ -38,6 +38,20 @@ class StructureLensAnalysisTests(unittest.TestCase):
         self.assertIn("What-if Analysis", md)
         self.assertIn("S=256", md)
 
+    def test_html_renders_interactive_group_graph_not_raw_markdown(self):
+        from structure_lens.render import render_html
+
+        report = analyze_model("examples/tiny_transformer_block.json", what_if={"S": 256}).to_dict()
+        doc = render_html(report)
+        self.assertIn('id="overview-graph"', doc)
+        self.assertIn('id="detail-view"', doc)
+        self.assertIn('id="lens-data"', doc)
+        self.assertIn('function selectGroup', doc)
+        self.assertIn('data-group-id="subgroup:AttentionCore:softmax"', doc)
+        self.assertIn('data-group-id="whatif:S=256"', doc)
+        self.assertIn('<table', doc)
+        self.assertNotIn('| Param | Dim | Tensor axes | Nodes touched |', doc)
+
 
 if __name__ == "__main__":
     unittest.main()
