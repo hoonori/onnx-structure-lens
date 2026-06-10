@@ -266,6 +266,50 @@ def _overview_group_graph_data(report: dict[str, Any], groups: list[dict[str, An
     }
 
 
+
+def _mermaid_label(value: Any) -> str:
+    return str(value).replace('"', "'").replace("\n", " ")
+
+
+def _mermaid_id(prefix: str, index: int) -> str:
+    return f"{prefix}{index}"
+
+
+def _render_mermaid_graph_block(
+    graph: dict[str, Any],
+    *,
+    block_id: str,
+    css_class: str,
+    node_title: str = "title",
+    clickable: bool = False,
+) -> str:
+    lines = ["---", "config:", "  layout: dagre", "---", "flowchart LR"]
+    node_ids: dict[str, str] = {}
+    for i, node in enumerate(graph.get("nodes", [])):
+        raw_id = str(node.get("id") or node.get("name"))
+        mid = _mermaid_id("g" if clickable else "n", i)
+        node_ids[raw_id] = mid
+        title = _mermaid_label(node.get(node_title) or node.get("name") or raw_id)
+        subtitle = _mermaid_label(node.get("kind") or node.get("op_type") or "")
+        label = title if not subtitle else f"{title}<br/><small>{subtitle}</small>"
+        lines.append(f'  {mid}["{label}"]')
+        if clickable:
+            lines.append(f'  click {mid} call selectGroup("{_mermaid_label(raw_id)}") "Open detail"')
+    for edge in graph.get("edges", []):
+        src = node_ids.get(str(edge["src"]))
+        dst = node_ids.get(str(edge["dst"]))
+        if not src or not dst:
+            continue
+        tensors = edge.get("tensors") or ([edge.get("tensor")] if edge.get("tensor") else [])
+        label = _mermaid_label(", ".join(str(t) for t in tensors[:3]))
+        lines.append(f"  %% data-overview-edge {edge['src']}->{edge['dst']}" if clickable else f"  %% data-node-edge {edge['src']}->{edge['dst']}")
+        if label:
+            lines.append(f'  {src} -->|"{label}"| {dst}')
+        else:
+            lines.append(f"  {src} --> {dst}")
+    return f'<pre id="{_h(block_id)}" class="mermaid {css_class}">{_h(chr(10).join(lines))}</pre>'
+
+
 def _overview_positions(graph: dict[str, Any]) -> dict[str, tuple[int, int]]:
     by_depth: dict[int, list[dict[str, Any]]] = {}
     for node in graph.get("nodes", []):
@@ -280,38 +324,13 @@ def _overview_positions(graph: dict[str, Any]) -> dict[str, tuple[int, int]]:
 
 def _render_overview_graph_svg(report: dict[str, Any], groups: list[dict[str, Any]]) -> str:
     graph = _overview_group_graph_data(report, groups)
-    if not graph["nodes"]:
-        return ""
-    positions = _overview_positions(graph)
-    max_x = max((x for x, _ in positions.values()), default=900) + 140
-    max_y = max((y for _, y in positions.values()), default=260) + 80
-    edge_svg: list[str] = []
-    for edge in graph["edges"]:
-        src = edge["src"]
-        dst = edge["dst"]
-        if src not in positions or dst not in positions:
-            continue
-        x1, y1 = positions[src]
-        x2, y2 = positions[dst]
-        mid = (x1 + x2) // 2
-        edge_id = f"{_h(src)}->{_h(dst)}"
-        labels = ", ".join(edge.get("tensors", [])[:3])
-        edge_svg.append(
-            f'<path class="topo-edge" data-overview-edge="{edge_id}" d="M{x1+74},{y1} C{mid},{y1} {mid},{y2} {x2-74},{y2}" />'
-            f'<text class="edge-label" x="{mid}" y="{(y1+y2)//2 - 6}">{_h(labels)}</text>'
-        )
-    node_by_id = {n["id"]: n for n in graph["nodes"]}
-    node_svg: list[str] = []
-    for gid, (x, y) in positions.items():
-        node = node_by_id[gid]
-        node_svg.append(
-            f'<g class="topo-node coarse-node {node["kind"]}" data-group-id="{_h(gid)}" tabindex="0">'
-            f'<rect x="{x-74}" y="{y-30}" width="148" height="60" rx="14" />'
-            f'<text class="node-title" x="{x}" y="{y-5}">{_h(node["title"][:20])}</text>'
-            f'<text class="node-subtitle" x="{x}" y="{y+16}">{_h(node["kind"])}</text>'
-            f'</g>'
-        )
-    return f'<svg id="overview-graph" class="topology-svg" viewBox="0 0 {max_x} {max_y}" role="img" aria-label="Coarse topology overview graph">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
+    return _render_mermaid_graph_block(
+        graph,
+        block_id="overview-graph",
+        css_class="overview-mermaid",
+        node_title="title",
+        clickable=True,
+    )
 
 def _build_group_data(report: dict[str, Any]) -> list[dict[str, Any]]:
     g = report["graph"]
@@ -429,11 +448,11 @@ def _render_static_detail(group: dict[str, Any]) -> str:
         table = _table(group["table"]["headers"], group["table"]["rows"])
     node_graph = ""
     if group.get("node_graph"):
-        node_graph = '<h4>internal node graph</h4>' + _render_node_graph_svg(
+        node_graph = '<h4>internal node graph</h4>' + _render_mermaid_graph_block(
             group["node_graph"],
-            svg_id=f"detail-node-graph-{group['id']}",
-            aria_label=f"Internal graph for {group['title']}",
-            node_class="mini-node",
+            block_id=f"detail-node-graph-{group['id']}",
+            css_class="detail-mermaid",
+            node_title="name",
         )
     return f"<section class=\"detail-card\"><h3>{_h(group['title'])}</h3><p>{_h(group['summary'])}</p><div class=\"metrics\">{metrics}</div>{node_graph}{'<ul>'+items+'</ul>' if items else ''}{table}</section>"
 
@@ -484,16 +503,181 @@ def _render_group_graph(groups: list[dict[str, Any]]) -> str:
     return f'<svg id="overview-graph" viewBox="0 0 1120 {height}" role="img" aria-label="Group overview graph">{"".join(edge_svg)}{"".join(node_svg)}</svg>'
 
 
+
+
+
+
+def _collapsed_edge_list(edges: list[dict[str, Any]], owner: dict[str, str]) -> list[dict[str, str]]:
+    collapsed: dict[tuple[str, str], set[str]] = {}
+    for edge in edges:
+        src = owner.get(edge["src"], edge["src"])
+        dst = owner.get(edge["dst"], edge["dst"])
+        if src == dst:
+            continue
+        collapsed.setdefault((src, dst), set()).add(str(edge.get("tensor") or ""))
+    return [
+        {"src": src, "dst": dst, "tensor": ", ".join(t for t in sorted(tensors) if t)}
+        for (src, dst), tensors in sorted(collapsed.items())
+    ]
+
+
+def _find_cycle_nodes(edges: list[dict[str, str]]) -> set[str]:
+    outgoing: dict[str, list[str]] = {}
+    nodes: set[str] = set()
+    for edge in edges:
+        src, dst = edge["src"], edge["dst"]
+        outgoing.setdefault(src, []).append(dst)
+        nodes.update([src, dst])
+    visiting: list[str] = []
+    visited: set[str] = set()
+
+    def visit(node: str) -> set[str]:
+        if node in visiting:
+            return set(visiting[visiting.index(node):])
+        if node in visited:
+            return set()
+        visiting.append(node)
+        for nxt in outgoing.get(node, []):
+            cycle = visit(nxt)
+            if cycle:
+                return cycle
+        visiting.pop()
+        visited.add(node)
+        return set()
+
+    for node in sorted(nodes):
+        cycle = visit(node)
+        if cycle:
+            return cycle
+    return set()
+
+
+def _decompose_cycle_groups(
+    display_groups: list[dict[str, Any]],
+    owner: dict[str, str],
+    edges: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str], list[str]]:
+    """Split groups until the fully collapsed viewer graph is acyclic.
+
+    Raw model graphs are expected to be DAGs, but collapsing arbitrary configured
+    groups can introduce cycles (A1→B1→A2→B2 collapses to A↔B). When that happens
+    we preserve the user's original group in the detail/chip config, but split
+    the viewer's visible collapse unit into single-node parts so dagre always
+    receives a DAG.
+    """
+
+    groups_by_id = {g["id"]: dict(g) for g in display_groups}
+    decomposed: list[str] = []
+    while True:
+        collapsed = _collapsed_edge_list(edges, owner)
+        cycle = _find_cycle_nodes(collapsed)
+        splittable = [gid for gid in cycle if gid in groups_by_id and len(groups_by_id[gid].get("nodes", [])) > 1]
+        if not splittable:
+            return list(groups_by_id.values()), owner, decomposed
+        for gid in splittable:
+            group = groups_by_id.pop(gid)
+            decomposed.append(gid)
+            for node in group.get("nodes", []):
+                part_id = f"{gid}::part::{node}"
+                groups_by_id[part_id] = {
+                    "id": part_id,
+                    "title": node,
+                    "full_title": f"{group.get('full_title', group['title'])} / {node}",
+                    "kind": f"{group.get('kind', 'group')}-part",
+                    "nodes": [node],
+                    "source_group": group.get("source_group", gid),
+                    "decomposed": True,
+                }
+                owner[node] = part_id
+
+
+def _viewer_graph_data(report: dict[str, Any], groups: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build TensorBoard-style expandable, cycle-safe graph data.
+
+    The viewer keeps raw model nodes and detected/configured groups separate. It
+    first assigns each node to one canonical group, then checks the fully
+    collapsed graph. If collapsing a configured group would introduce a cycle,
+    that group is decomposed into smaller visible parts until the collapsed graph
+    is acyclic. The original group remains available in the detail/chip data.
+    """
+
+    owner = _group_node_lookup(groups)
+    node_graph = _node_graph_data(report)
+    initial_groups: list[dict[str, Any]] = []
+    for g in groups:
+        if not g["id"].startswith("subgroup:"):
+            continue
+        owned_nodes = [n for n in g.get("nodes", []) if owner.get(n) == g["id"]]
+        if not owned_nodes:
+            continue
+        initial_groups.append(
+            {
+                "id": g["id"],
+                "title": _overview_label(g),
+                "full_title": g["title"],
+                "kind": g["kind"],
+                "nodes": owned_nodes,
+                "source_group": g["id"],
+                "decomposed": False,
+            }
+        )
+    display_groups, owner, decomposed = _decompose_cycle_groups(initial_groups, dict(owner), node_graph["edges"])
+    source_group_ids = {g.get("source_group", g["id"]) for g in display_groups}
+    tree = [
+        {
+            "id": source_id,
+            "title": next((g["title"] for g in groups if g["id"] == source_id), source_id),
+            "kind": next((g["kind"] for g in groups if g["id"] == source_id), "group"),
+            "children": [
+                {"id": vg["id"], "title": vg["title"], "kind": vg["kind"], "nodes": vg.get("nodes", [])}
+                for vg in display_groups
+                if vg.get("source_group", vg["id"]) == source_id
+            ],
+        }
+        for source_id in sorted(source_group_ids)
+    ]
+    collapsed_edges = _collapsed_edge_list(node_graph["edges"], owner)
+    return {
+        "groups": sorted(display_groups, key=lambda g: min((report["topology"].get("depth_by_node", {}).get(n, 0) for n in g.get("nodes", [])), default=0)),
+        "nodes": [
+            {
+                "id": n["name"],
+                "label": n["name"],
+                "op_type": n.get("op_type", "?"),
+                "depth": n.get("depth", 0),
+                "group": owner.get(n["name"]),
+            }
+            for n in node_graph["nodes"]
+        ],
+        "edges": node_graph["edges"],
+        "collapsed_edges": collapsed_edges,
+        "owner": owner,
+        "tree": tree,
+        "decomposed_groups": decomposed,
+        "cycle_safe": not _find_cycle_nodes(collapsed_edges),
+    }
+
 def render_html(report: dict[str, Any]) -> str:
     groups = _build_group_data(report)
-    overview_graph = _render_overview_graph_svg(report, groups)
-    payload = json.dumps({"report": report, "groups": groups}, ensure_ascii=False).replace("</", "<\\/")
+    viewer_graph = _viewer_graph_data(report, groups)
+    payload = json.dumps({"report": report, "groups": groups, "viewerGraph": viewer_graph}, ensure_ascii=False).replace("</", "<\\/")
     initial_detail = _render_static_detail(groups[0])
     graph = report["graph"]
     chips = "".join(
         f'<button class="chip" data-group-id="{_h(g["id"])}">{_h(g["title"])}</button>'
         for g in groups[:18]
     )
+    tree_html_parts: list[str] = []
+    for root in viewer_graph.get("tree", []):
+        focus_id = root.get("children", [{}])[0].get("id", root["id"]) if root.get("children") else root["id"]
+        tree_html_parts.append(
+            f'<button class="tree-row" data-tree-id="{_h(root["id"])}" onclick="focusGraphItem(\'{_h(focus_id)}\')"><span class="tree-toggle">▾</span><span>{_h(root["title"])}</span><span class="tree-kind">{_h(root["kind"])}</span></button>'
+        )
+        for child in root.get("children", []):
+            tree_html_parts.append(
+                f'<button class="tree-row" style="padding-left:24px" data-tree-id="{_h(child["id"])}" onclick="focusGraphItem(\'{_h(child["id"])}\')"><span class="tree-toggle">•</span><span>{_h(child["title"])}</span><span class="tree-kind">{_h(child["kind"])}</span></button>'
+            )
+    initial_tree = "".join(tree_html_parts)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -507,37 +691,27 @@ body {{ margin:0; background:radial-gradient(circle at 20% 0%, #13284a 0, var(--
 header {{ position:sticky; top:0; z-index:10; background:#08111fe8; backdrop-filter: blur(10px); padding:16px 22px; border-bottom:1px solid var(--line); }}
 h1 {{ margin:0 0 8px; font-size:22px; }}
 .badge {{ display:inline-flex; gap:6px; align-items:center; margin:0 8px 6px 0; padding:5px 10px; border:1px solid #315071; border-radius:999px; color:#bfdbfe; background:#0b1d33; }}
-main {{ padding:18px; max-width:1380px; margin:0 auto; }}
-.grid {{ display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(360px, .8fr); gap:18px; align-items:start; }}
+main {{ padding:18px; max-width:1560px; margin:0 auto; }}
+.grid {{ display:grid; grid-template-columns:280px minmax(0, 1.2fr) minmax(380px, .75fr); gap:18px; align-items:start; }}
 .card, .detail-card {{ background:linear-gradient(180deg, #111d31, #0d1728); border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 14px 40px #0007; }}
 .card h2, .detail-card h3 {{ margin:0 0 10px; }}
-.graph-card {{ overflow:auto; grid-column:1 / -1; }}
-#overview-graph {{ min-width:900px; width:100%; height:auto; display:block; }}
-.edge {{ stroke:#39536f; stroke-width:2; opacity:.9; }}
-.topology-svg {{ min-width:900px; width:100%; height:auto; display:block; }}
-.topo-edge {{ fill:none; stroke:#496580; stroke-width:2; opacity:.9; }}
-.edge-label {{ fill:#88a2bd; font-size:10px; paint-order:stroke; stroke:#08111f; stroke-width:4px; stroke-linejoin:round; }}
-.topo-node, .mini-node {{ cursor:pointer; outline:none; }}
-.topo-node rect, .mini-node rect {{ fill:#13223a; stroke:#3b5d7d; stroke-width:1.3; filter: drop-shadow(0 7px 10px #0007); }}
-.topo-node:hover rect, .topo-node.active rect, .mini-node:hover rect, .mini-node.active rect {{ fill:#173456; stroke:#7dd3fc; }}
-.mini-node rect {{ fill:#102033; }}
-.detail-card h4 {{ margin:16px 0 8px; color:#bfdbfe; }}
-.node {{ cursor:pointer; outline:none; }}
-.node rect {{ fill:#13223a; stroke:#3b5d7d; stroke-width:1.5; filter: drop-shadow(0 8px 12px #0008); transition:fill .15s, stroke .15s, transform .15s; }}
-.node:hover rect, .node.active rect {{ fill:#173456; stroke:#7dd3fc; }}
-.node.model rect {{ fill:#172554; stroke:#60a5fa; }}
-.node.topology rect {{ fill:#123524; stroke:#34d399; }}
-.node.shape rect {{ fill:#33245d; stroke:#a78bfa; }}
-.node.impact rect, .node.cost rect {{ fill:#442817; stroke:#fbbf24; }}
-.node.whatif rect {{ fill:#4a1635; stroke:#f472b6; }}
-.node.attention rect {{ fill:#3b1f54; stroke:#c084fc; }}
-.node.residual rect {{ fill:#482121; stroke:#fb7185; }}
-.node text {{ text-anchor:middle; pointer-events:none; }}
-.node-title {{ fill:#f8fafc; font-weight:700; font-size:13px; }}
-.node-subtitle {{ fill:#a9bdd4; font-size:11px; text-transform:uppercase; letter-spacing:.07em; }}
+.graph-card {{ grid-column:2 / 3; }}
+.nav-card {{ position:sticky; top:92px; max-height:calc(100vh - 112px); overflow:auto; }}
+.nav-card h2 {{ font-size:15px; margin:0 0 8px; color:#bfdbfe; }}
+.cycle-safe {{ color:#86efac; font-size:12px; margin:4px 0 12px; }}
+.file-tree {{ display:flex; flex-direction:column; gap:3px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }}
+.tree-row {{ width:100%; display:flex; gap:6px; align-items:center; border:0; border-radius:8px; padding:6px 7px; background:transparent; color:#cbd5e1; text-align:left; cursor:pointer; }}
+.tree-row:hover, .tree-row.active {{ background:#13223a; color:#fff; }}
+.tree-toggle {{ color:#93c5fd; width:16px; display:inline-block; }}
+.tree-kind {{ color:#94a3b8; font-size:10px; margin-left:auto; }}
+.toolbar {{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 12px; }}
+.toolbtn {{ border:1px solid #38516e; background:#0b1d33; color:#dbeafe; border-radius:10px; padding:7px 10px; cursor:pointer; }}
+.toolbtn:hover {{ border-color:#7dd3fc; color:white; }}
+#graph-viewer {{ width:100%; height:620px; min-height:440px; border:1px solid #263d59; border-radius:16px; background:#07101d; }}
+.viewer-hint {{ color:#a9bdd4; margin:0 0 8px; }}
 .chips {{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }}
 .chip {{ border:1px solid #38516e; background:#0b1d33; color:#dbeafe; border-radius:999px; padding:7px 10px; cursor:pointer; }}
-.chip:hover {{ border-color:#7dd3fc; color:white; }}
+.chip:hover, .chip.active {{ border-color:#7dd3fc; color:white; }}
 .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:12px 0; }}
 .metric {{ display:block; padding:10px; border:1px solid #2e4661; background:#0b1829; border-radius:12px; }}
 .metric b {{ display:block; color:#9fb4cc; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }}
@@ -551,7 +725,7 @@ ul {{ padding-left:20px; color:#d5e3f3; }}
 .raw-json {{ margin-top:18px; }}
 .raw-json summary {{ cursor:pointer; color:#93c5fd; }}
 .raw-json pre {{ white-space:pre-wrap; max-height:360px; overflow:auto; background:#07101d; padding:14px; border-radius:12px; }}
-@media (max-width: 900px) {{ .grid {{ grid-template-columns:1fr; }} header {{ position:static; }} main {{ padding:12px; }} .card, .detail-card {{ border-radius:14px; }} }}
+@media (max-width: 1100px) {{ .grid {{ grid-template-columns:1fr; }} .graph-card {{ grid-column:auto; }} .nav-card {{ position:static; max-height:none; }} header {{ position:static; }} main {{ padding:12px; }} #graph-viewer {{ height:520px; }} }}
 </style>
 </head>
 <body>
@@ -563,10 +737,20 @@ ul {{ padding-left:20px; color:#d5e3f3; }}
 </header>
 <main>
 <section class="grid">
+  <nav class="card nav-card" aria-label="Graph file structure">
+    <h2>Graph Structure</h2>
+    <p class="cycle-safe">cycle-safe collapse: groups are decomposed before a collapsed cycle can appear.</p>
+    <div id="graph-tree" class="file-tree">{initial_tree}</div>
+  </nav>
   <article class="card graph-card">
-    <h2>Topology-aware overview graph</h2>
-    <p>Edges follow producer → consumer tensor topology. Click a node to open its detected subgroup/detail pane; use chips for other report sections.</p>
-    {overview_graph}
+    <h2>TensorBoard-style expandable graph viewer</h2>
+    <p class="viewer-hint">Click a block/node to inspect it. Double-click a block, or use the detail button, to expand/collapse internal nodes. Layout is recomputed with dagre after each change.</p>
+    <div class="toolbar">
+      <button class="toolbtn" onclick="expandAllGroups()">Expand all</button>
+      <button class="toolbtn" onclick="collapseAllGroups()">Collapse all</button>
+      <button class="toolbtn" onclick="fitGraph()">Fit</button>
+    </div>
+    <div id="graph-viewer" role="img" aria-label="Expandable model graph viewer"></div>
     <div class="chips">{chips}</div>
   </article>
   <aside id="detail-view" class="detail-card">{initial_detail}</aside>
@@ -576,16 +760,30 @@ ul {{ padding-left:20px; color:#d5e3f3; }}
   <pre>{_h(json.dumps(report, indent=2, ensure_ascii=False))}</pre>
 </details>
 <script id="lens-data" type="application/json">{payload}</script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
 <script>
 const lensPayload = JSON.parse(document.getElementById('lens-data').textContent);
 const groups = new Map(lensPayload.groups.map(g => [g.id, g]));
+const viewerGraph = lensPayload.viewerGraph;
+const viewerGroups = new Map(viewerGraph.groups.map(g => [g.id, g]));
+for (const vg of viewerGraph.groups) {{
+  if (!groups.has(vg.id)) {{
+    groups.set(vg.id, {{ id: vg.id, title: vg.full_title || vg.title, kind: vg.kind, summary: vg.decomposed ? `Decomposed cycle-safe part of ${{vg.source_group}}` : 'Viewer collapse group', nodes: vg.nodes || [], metrics: {{ Nodes: (vg.nodes || []).length }}, items: vg.decomposed ? ['This visible part was split from its configured group to prevent collapsed graph cycles.'] : [] }});
+  }}
+}}
+const expandedGroups = new Set();
+let selectedGroupId = null;
+let cy = null;
+
 function fmt(value) {{
   if (value === null || value === undefined) return '?';
   if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
   return String(value);
 }}
 function esc(value) {{
-  return String(value).replace(/[&<>\"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}}[ch]));
+  return String(value).replace(/[&<>"']/g, ch => ({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]));
 }}
 function renderTable(table) {{
   if (!table) return '';
@@ -596,44 +794,134 @@ function renderTable(table) {{
 function renderMetrics(metrics) {{
   return Object.entries(metrics || {{}}).map(([k,v]) => `<span class="metric"><b>${{esc(k)}}</b><em>${{esc(fmt(v))}}</em></span>`).join('');
 }}
-function renderNodeGraph(graph) {{
-  if (!graph || !graph.nodes || !graph.nodes.length) return '';
-  const byDepth = new Map();
-  graph.nodes.forEach(n => {{
-    const depth = Number(n.depth || 0);
-    if (!byDepth.has(depth)) byDepth.set(depth, []);
-    byDepth.get(depth).push(n);
-  }});
-  const pos = new Map();
-  const minDepth = Math.min(...[...byDepth.keys()], 0);
-  [...byDepth.entries()].forEach(([depth, nodes]) => {{
-    nodes.forEach((n, lane) => pos.set(n.name, {{x: 70 + (depth - minDepth) * 130, y: 54 + lane * 74}}));
-  }});
-  const maxX = Math.max(...[...pos.values()].map(p => p.x), 720) + 90;
-  const maxY = Math.max(...[...pos.values()].map(p => p.y), 180) + 58;
-  const paths = (graph.edges || []).map(e => {{
-    const a = pos.get(e.src), b = pos.get(e.dst);
-    if (!a || !b) return '';
-    const mid = Math.round((a.x + b.x) / 2);
-    const edgeId = `${{e.src}}->${{e.dst}}`;
-    return `<path class="topo-edge" data-node-edge="${{esc(edgeId)}}" d="M${{a.x+46}},${{a.y}} C${{mid}},${{a.y}} ${{mid}},${{b.y}} ${{b.x-46}},${{b.y}}" />`;
+function isViewerGroup(id) {{ return viewerGroups.has(id); }}
+function treeRows() {{
+  const roots = viewerGraph.tree || [];
+  return roots.flatMap(root => [root, ...(root.children || [])]);
+}}
+function renderTree() {{
+  const container = document.getElementById('graph-tree');
+  if (!container) return;
+  container.innerHTML = (viewerGraph.tree || []).map(root => {{
+    const rootExpanded = true;
+    const children = (root.children || []).map(child => `<button class="tree-row" style="padding-left:24px" data-tree-id="${{esc(child.id)}}" onclick="focusGraphItem('${{esc(child.id)}}')"><span class="tree-toggle">•</span><span>${{esc(child.title)}}</span><span class="tree-kind">${{esc(child.kind)}}</span></button>`).join('');
+    return `<button class="tree-row" data-tree-id="${{esc(root.id)}}" onclick="focusGraphItem('${{esc((root.children && root.children[0] && root.children[0].id) || root.id)}}')"><span class="tree-toggle">${{rootExpanded ? '▾' : '▸'}}</span><span>${{esc(root.title)}}</span><span class="tree-kind">${{esc(root.kind)}}</span></button>${{children}}`;
   }}).join('');
-  const nodes = graph.nodes.map(n => {{
-    const p = pos.get(n.name);
-    return `<g class="mini-node" data-node-name="${{esc(n.name)}}"><rect x="${{p.x-46}}" y="${{p.y-23}}" width="92" height="46" rx="10" /><text class="node-title" x="${{p.x}}" y="${{p.y-3}}">${{esc(n.name)}}</text><text class="node-subtitle" x="${{p.x}}" y="${{p.y+14}}">${{esc(n.op_type || '?')}}</text></g>`;
-  }}).join('');
-  return `<h4>internal node graph</h4><svg class="topology-svg" viewBox="0 0 ${{maxX}} ${{maxY}}" role="img" aria-label="internal node graph">${{paths}}${{nodes}}</svg>`;
+}}
+function markTree(id) {{
+  document.querySelectorAll('[data-tree-id]').forEach(el => el.classList.toggle('active', el.getAttribute('data-tree-id') === id));
+}}
+function focusGraphItem(id) {{
+  if (isViewerGroup(id) && !expandedGroups.has(id)) {{
+    // Keep it collapsed but visible, matching file explorer focus semantics.
+  }}
+  selectGroup(id);
+  if (cy) {{
+    const ele = cy.getElementById(id);
+    if (ele && ele.length) {{
+      cy.elements().removeClass('selected');
+      ele.addClass('selected');
+      cy.animate({{ fit: {{ eles: ele, padding: 120 }}, duration: 240 }});
+    }}
+  }}
+  markTree(id);
+}}
+function endpointFor(nodeId, role) {{
+  const owner = viewerGraph.owner[nodeId];
+  if (owner) return expandedGroups.has(owner) ? nodeId : owner;
+  return role === 'src' ? 'graph:inputs' : 'graph:outputs';
+}}
+function visibleElements() {{
+  const elements = [];
+  elements.push({{ data: {{ id: 'graph:inputs', label: 'Inputs', kind: 'io', type: 'boundary' }} }});
+  elements.push({{ data: {{ id: 'graph:outputs', label: 'Outputs', kind: 'io', type: 'boundary' }} }});
+  for (const group of viewerGraph.groups) {{
+    const expanded = expandedGroups.has(group.id);
+    elements.push({{ data: {{ id: group.id, label: `${{group.title}} ${{expanded ? '[-]' : '[+]'}}`, kind: group.kind, type: 'group', groupId: group.id, expanded }} }});
+    if (expanded) {{
+      for (const nodeName of group.nodes) {{
+        const n = viewerGraph.nodes.find(x => x.id === nodeName);
+        if (!n) continue;
+        elements.push({{ data: {{ id: n.id, label: n.label, op_type: n.op_type, kind: 'op', type: 'node', parent: group.id, groupId: group.id }} }});
+      }}
+    }}
+  }}
+  const edgeSeen = new Set();
+  for (const e of viewerGraph.edges) {{
+    const srcOwner = viewerGraph.owner[e.src];
+    const dstOwner = viewerGraph.owner[e.dst];
+    let src, dst;
+    if (srcOwner && srcOwner === dstOwner) {{
+      if (!expandedGroups.has(srcOwner)) continue;
+      src = e.src; dst = e.dst;
+    }} else {{
+      src = endpointFor(e.src, 'src');
+      dst = endpointFor(e.dst, 'dst');
+    }}
+    if (!src || !dst || src === dst) continue;
+    const key = `${{src}}->${{dst}}:${{e.tensor || ''}}`;
+    if (edgeSeen.has(key)) continue;
+    edgeSeen.add(key);
+    elements.push({{ data: {{ id: `edge:${{edgeSeen.size}}`, source: src, target: dst, label: e.tensor || '', srcRaw: e.src, dstRaw: e.dst }} }});
+  }}
+  return elements;
+}}
+function renderGraph() {{
+  const elements = visibleElements();
+  if (cy) cy.destroy();
+  cy = cytoscape({{
+    container: document.getElementById('graph-viewer'),
+    elements,
+    wheelSensitivity: 0.18,
+    minZoom: 0.08,
+    maxZoom: 3,
+    style: [
+      {{ selector: 'node', style: {{ 'background-color': '#173456', 'border-color': '#7dd3fc', 'border-width': 1.5, 'color': '#e5eefb', 'label': 'data(label)', 'text-valign': 'center', 'text-halign': 'center', 'font-size': 11, 'text-wrap': 'wrap', 'text-max-width': 110, 'width': 112, 'height': 46 }} }},
+      {{ selector: 'node[type="group"]', style: {{ 'shape': 'round-rectangle', 'background-color': '#172554', 'border-color': '#60a5fa', 'font-weight': 700, 'width': 150, 'height': 58 }} }},
+      {{ selector: 'node[type="boundary"]', style: {{ 'shape': 'round-rectangle', 'background-color': '#123524', 'border-color': '#34d399', 'width': 110 }} }},
+      {{ selector: 'node[type="node"]', style: {{ 'background-color': '#102033', 'border-color': '#64748b', 'font-size': 10 }} }},
+      {{ selector: ':parent', style: {{ 'background-opacity': 0.14, 'background-color': '#334155', 'border-style': 'dashed', 'padding': 18 }} }},
+      {{ selector: 'edge', style: {{ 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'line-color': '#496580', 'target-arrow-color': '#7dd3fc', 'width': 1.5, 'label': 'data(label)', 'font-size': 8, 'color': '#a9bdd4', 'text-background-color': '#07101d', 'text-background-opacity': 0.9, 'text-background-padding': 2 }} }},
+      {{ selector: '.selected', style: {{ 'border-width': 4, 'border-color': '#fbbf24' }} }}
+    ],
+    layout: {{ name: 'dagre', rankDir: 'LR', nodeSep: 50, rankSep: 90, edgeSep: 16, fit: true, padding: 40 }}
+  }});
+  cy.on('tap', 'node', event => {{
+    const data = event.target.data();
+    cy.elements().removeClass('selected');
+    event.target.addClass('selected');
+    if (data.groupId) selectGroup(data.groupId);
+    else if (data.type === 'boundary') selectBoundary(data.id);
+  }});
+  cy.on('dbltap', 'node[type="group"]', event => toggleGroup(event.target.data('groupId')));
+}}
+function fitGraph() {{ if (cy) cy.fit(undefined, 40); }}
+function toggleGroup(id) {{
+  if (!isViewerGroup(id)) return;
+  if (expandedGroups.has(id)) expandedGroups.delete(id); else expandedGroups.add(id);
+  renderGraph();
+  selectGroup(id);
+}}
+function expandAllGroups() {{ viewerGraph.groups.forEach(g => expandedGroups.add(g.id)); renderGraph(); }}
+function collapseAllGroups() {{ expandedGroups.clear(); renderGraph(); }}
+function selectBoundary(id) {{
+  document.getElementById('detail-view').innerHTML = `<h3>${{id === 'graph:inputs' ? 'Inputs' : 'Outputs'}}</h3><p>Boundary placeholder for currently collapsed graph edges.</p>`;
 }}
 function selectGroup(id) {{
   const g = groups.get(id);
   if (!g) return;
+  selectedGroupId = id;
   document.querySelectorAll('[data-group-id]').forEach(el => el.classList.toggle('active', el.getAttribute('data-group-id') === id));
+  markTree(id);
   const items = (g.items || []).map(item => `<li>${{esc(item)}}</li>`).join('');
+  const toggle = isViewerGroup(id) ? `<button class="toolbtn" onclick="toggleGroup('${{esc(id)}}')">${{expandedGroups.has(id) ? 'Collapse' : 'Expand'}} in graph</button>` : '';
+  const nodes = g.nodes ? `<p><b>Nodes:</b> ${{esc(g.nodes.join(', '))}}</p>` : '';
   document.getElementById('detail-view').innerHTML = `
     <h3>${{esc(g.title)}}</h3>
     <p>${{esc(g.summary)}}</p>
+    <div class="toolbar">${{toggle}}</div>
     <div class="metrics">${{renderMetrics(g.metrics)}}</div>
-    ${{renderNodeGraph(g.node_graph)}}
+    ${{nodes}}
     ${{items ? `<ul>${{items}}</ul>` : ''}}
     ${{renderTable(g.table)}}
   `;
@@ -641,18 +929,16 @@ function selectGroup(id) {{
 document.querySelectorAll('[data-group-id]').forEach(el => {{
   el.addEventListener('click', () => selectGroup(el.getAttribute('data-group-id')));
   el.addEventListener('keydown', event => {{
-    if (event.key === 'Enter' || event.key === ' ') {{
-      event.preventDefault();
-      selectGroup(el.getAttribute('data-group-id'));
-    }}
+    if (event.key === 'Enter' || event.key === ' ') {{ event.preventDefault(); selectGroup(el.getAttribute('data-group-id')); }}
   }});
 }});
+renderTree();
+renderGraph();
 selectGroup('model:summary');
 </script>
 </main>
 </body>
 </html>"""
-
 
 def write_html(report: dict[str, Any], path: str | Path) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)

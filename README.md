@@ -38,6 +38,11 @@ PYTHONPATH=src python -m structure_lens.cli examples/tiny_transformer_block.json
   --json reports/demo.json
 ```
 
+The generated HTML report is designed for visual inspection: it starts with a
+coarse, collapsible graph view and lets you click into grouped structures,
+shape parameters, rough operation costs, and what-if deltas without reading raw
+Markdown tables.
+
 Run tests without extra dependencies:
 
 ```bash
@@ -59,8 +64,9 @@ structure-lens model.onnx --markdown reports/model.md --html reports/model.html
 
 ## Current scope
 
-This is a **night-one prototype**. It is useful for model understanding and
-research, not a replacement for a proprietary backend performance model.
+This is an **early prototype** for open-source model understanding workflows. It
+is useful for model inspection and research, not a replacement for a proprietary
+backend performance model.
 
 Implemented:
 
